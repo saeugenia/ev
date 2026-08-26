@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Termómetro Narrativo y Musical</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Plus Jakarta Sans', 'sans-serif'],
+                        display: ['Fredoka', 'sans-serif'],
+                    },
+                    colors: {
+                        base: {
+                            bg: '#FFF9F2',
+                            surface: '#FFFDF9',
+                            border: '#E9DFD3',
+                            text: '#263238',
+                            muted: '#546E7A'
+                        },
+                        temp: {
+                            cold: '#4DB6AC',   
+                            medium: '#FDD835', 
+                            hot: '#FB8C00',    
+                            max: '#F4511E'     
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body { background-color: #FFF9F2; color: #263238; }
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #E9DFD3; border-radius: 10px; }
+
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+            height: 24px;
+            border-radius: 12px;
+            cursor: pointer;
+        }
+        input[type=range]:focus { outline: none; }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%; height: 12px; cursor: pointer;
+            background: linear-gradient(to right, #4DB6AC, #FDD835, #FB8C00, #F4511E);
+            border-radius: 6px; border: 1px solid #E9DFD3;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            height: 28px; width: 28px; border-radius: 50%; background: #FFFDF9;
+            border: 3px solid #263238; cursor: pointer; -webkit-appearance: none;
+            margin-top: -9px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); transition: transform 0.1s;
+        }
+        .fade-in { animation: fadeIn 0.3s ease-out forwards; }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .visually-hidden { display: none !important; }
+    </style>
+</head>
+
+<body class="h-screen w-screen flex flex-col font-sans overflow-hidden">
+
+    <header class="bg-base-surface border-b border-base-border py-4 px-6 md:px-8 shrink-0 z-10 shadow-sm flex flex-col md:flex-row gap-6 justify-between items-start">
+        <div class="flex-shrink-0 flex flex-col items-start gap-2">
+            <h1 class="font-display text-2xl md:text-3xl font-semibold text-base-text flex items-center gap-2">
+                <span id="appIcon" class="text-3xl">🌡️</span> <span id="appTitle">Termómetro Narrativo</span>
+            </h1>
+            
+            <div class="flex flex-wrap items-center gap-2 mt-1">
+                <button id="modeToggleBtn" onclick="toggleMode()" class="px-3 py-1.5 rounded-lg text-xs font-bold border border-base-border bg-base-bg text-base-text hover:bg-white shadow-sm flex items-center gap-1">
+                    📖 Modo Lectura
+                </button>
+                
+                <div class="h-4 w-px bg-base-border mx-1 hidden sm:block"></div>
+                
+                <button onclick="exportData()" class="text-xs font-bold bg-base-text text-white hover:bg-black px-3 py-1.5 rounded-lg transition-colors shadow-sm flex items-center gap-1">
+                    📤 Exportar
+                </button>
+                
+                <label class="text-xs font-bold bg-white text-base-text border border-base-border hover:bg-base-bg px-3 py-1.5 rounded-lg transition-colors shadow-sm cursor-pointer flex items-center gap-1 mb-0">
+                    📥 Importar
+                    <input type="file" accept=".json" onchange="importData(event)" class="hidden">
+                </label>
+
+                <button onclick="clearData()" class="text-[11px] font-bold text-temp-max hover:bg-temp-max/10 px-2 py-1.5 rounded-lg border border-temp-max/20 ml-1">
+                    🗑️ Borrar todo
+                </button>
+            </div>
+        </div>
+        
+        <div class="flex flex-wrap gap-4 w-full md:w-auto md:flex-1 justify-end">
+            <div class="flex flex-col gap-2 w-full md:w-auto">
+                <div class="flex items-center gap-2 bg-base-bg border border-base-border rounded-xl px-3 py-1.5">
+                    <span id="titleIcon" class="text-lg">📖</span>
+                    <input type="text" id="storyTitle" oninput="saveData()" placeholder="Título del cuento..." class="bg-transparent border-none outline-none text-sm font-semibold w-full md:w-48">
+                </div>
+                <div class="flex items-center gap-2 bg-base-bg border border-base-border rounded-xl px-3 py-1.5">
+                    <span id="authorIcon" class="text-lg">✍️</span>
+                    <input type="text" id="storyAuthor" oninput="saveData()" placeholder="Autor / Autora..." class="bg-transparent border-none outline-none text-sm font-medium w-full md:w-48">
+                </div>
+            </div>
+            
+            <div class="flex flex-col gap-2 bg-base-bg border border-base-border rounded-xl px-3 py-2 w-full md:w-72">
+                <label id="charLabel" class="block text-[10px] font-bold text-base-muted uppercase">👥 Lista de Personajes</label>
+                <div class="flex items-center gap-2">
+                    <input type="text" id="newCharacterInput" placeholder="Agregar..." class="bg-transparent border-none outline-none text-sm font-medium w-full" onkeypress="if(event.key === 'Enter') addGlobalCharacter()">
+                    <button onclick="addGlobalCharacter()" class="text-temp-hot bg-white rounded-lg px-2.5 py-1 border border-base-border text-sm font-bold">➕</button>
+                </div>
+                <div id="characterTags" class="flex flex-wrap gap-1.5 empty:hidden mt-0.5"></div>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-1 flex flex-col lg:flex-row overflow-hidden relative bg-base-bg">
+        <section class="lg:w-3/5 p-6 md:p-8 flex flex-col h-full relative z-0">
+            <div class="flex-1 flex flex-col bg-base-surface border border-base-border rounded-3xl p-5 shadow-sm">
+                <h2 id="chartTitle" class="font-display text-xl text-base-text font-medium flex items-center gap-2 mb-2">
+                    📈 Curva de intensidad
+                </h2>
+                <div class="flex-1 relative min-h-[300px] w-full mt-4">
+                    <canvas id="thermometerChart"></canvas>
+                </div>
+            </div>
+
+            <div id="finalReflectionArea" class="mt-6 bg-white border border-base-border rounded-3xl p-6 visually-hidden fade-in shadow-sm">
+                <h3 id="reflectionTitle" class="font-display text-xl font-semibold mb-4 text-base-text">
+                    👀 Tu historia, vista de nuevo
+                </h3>
+                <div id="finalReflectionQuestions" class="space-y-5 text-sm font-medium"></div>
+                <div class="mt-6 flex justify-end">
+                    <button onclick="cerrarReflexion()" class="px-5 py-2 text-sm font-semibold bg-base-bg border border-base-border rounded-xl hover:bg-base-border">
+                        Volver a editar
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <section class="lg:w-2/5 border-l border-base-border bg-base-surface h-full flex flex-col relative z-20 shadow-[-5px_0_15px_rgba(0,0,0,0.02)]">
+            <div class="p-5 border-b border-base-border shrink-0 flex items-center justify-between bg-white">
+                <h2 id="timelineTitle" class="font-display text-lg font-medium">Momentos de la historia</h2>
+                <button onclick="terminarYReflexionar()" id="btnTerminar" class="visually-hidden px-4 py-2 bg-base-bg border border-base-border text-sm font-semibold rounded-xl hover:bg-base-text hover:text-white transition-colors">
+                    🏁 Reflexión Final
+                </button>
+            </div>
+
+            <div id="momentsList" class="flex-1 overflow-y-auto p-5 space-y-6 bg-base-bg"></div>
+
+            <div class="p-5 border-t border-base-border bg-white shrink-0">
+                <button id="btnAddMoment" onclick="addMoment()" class="w-full py-3.5 bg-temp-hot hover:bg-temp-max text-white rounded-xl text-base font-semibold transition-colors">
+                    ➕ Agregar momento
+                </button>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        const EMOTIONS = [
+            { id: 'calma', icon: '😌', label: 'Calma' },
+            { id: 'alegria', icon: '😊', label: 'Alegría' },
+            { id: 'tristeza', icon: '😢', label: 'Tristeza' },
+            { id: 'asombro', icon: '😲', label: 'Asombro' },
+            { id: 'suspenso', icon: '😰', label: 'Suspenso' },
+            { id: 'rabia', icon: '😡', label: 'Rabia' },
+            { id: 'miedo', icon: '😨', label: 'Miedo' }
+        ];
+
+        const getTempColor = (val) => {
+            if(val <= 30) return '#4DB6AC'; 
+            if(val <= 60) return '#FDD835'; 
+            if(val <= 85) return '#FB8C00'; 
+            return '#F4511E'; 
+        };
+
+        const getTempLabel = (val) => {
+            if(val <= 30) return 'Fría / Calma';
+            if(val <= 60) return 'Tibia / Interesante';
+            if(val <= 85) return 'Caliente / Tensa';
+            return '¡Fuego! / Clímax';
+        };
+
+        let moments = [];
+        let chartInstance = null;
+        let parsedCharacters = [];
+        let editingMomentId = null; 
+        let isMusicMode = false; 
+
+        function exportData() {
+            const dataToSave = {
+                moments: moments,
+                parsedCharacters: parsedCharacters,
+                title: document.getElementById('storyTitle').value,
+                author: document.getElementById('storyAuthor').value
+            };
+            
+            const dataStr = JSON.stringify(dataToSave, null, 2);
+            const blob = new Blob([dataStr], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.href = url;
+            let fileName = dataToSave.title ? dataToSave.title.replace(/\s+/g, '_') : 'Sesion';
+            a.download = `Termometro_${fileName}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        function importData(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const importedData = JSON.parse(e.target.result);
+                    
+                    moments = importedData.moments || [];
+                    parsedCharacters = importedData.parsedCharacters || [];
+                    document.getElementById('storyTitle').value = importedData.title || '';
+                    document.getElementById('storyAuthor').value = importedData.author || '';
+                    
+                    editingMomentId = null; 
+                    saveData();
+                    
+                    renderGlobalCharacters();
+                    renderMoments();
+                    updateChart();
+                    
+                    if (moments.length > 0) {
+                        document.getElementById('btnTerminar').classList.remove('visually-hidden');
+                    }
+                    
+                    alert("✅ ¡Archivo cargado con éxito!");
+                } catch (error) {
+                    alert("❌ Hubo un error al leer el archivo. Asegúrate de que sea un archivo .json válido.");
+                    console.error(error);
+                }
+            };
+            reader.readAsText(file);
+            event.target.value = ''; 
+        }
+
+        function saveData() {
+            const data = {
+                moments,
+                parsedCharacters,
+                title: document.getElementById('storyTitle').value,
+                author: document.getElementById('storyAuthor').value
+            };
+            localStorage.setItem('termometroNarrativoData', JSON.stringify(data));
+        }
+
+        function loadData() {
+            const dataStr = localStorage.getItem('termometroNarrativoData');
+            if (dataStr) {
+                try {
+                    const data = JSON.parse(dataStr);
+                    moments = data.moments || [];
+                    parsedCharacters = data.parsedCharacters || [];
+                    document.getElementById('storyTitle').value = data.title || '';
+                    document.getElementById('storyAuthor').value = data.author || '';
+                    
+                    if (moments.length > 0) document.getElementById('btnTerminar').classList.remove('visually-hidden');
+                } catch(e) { console.error(e); }
+            }
+            renderGlobalCharacters();
+            renderMoments();
+            updateChart();
+        }
+
+        function clearData() {
+            if (confirm("¿Seguro que quieres borrar todos los datos de esta sesión en esta computadora?")) {
+                localStorage.removeItem('termometroNarrativoData');
+                moments = [];
+                parsedCharacters = [];
+                document.getElementById('storyTitle').value = '';
+                document.getElementById('storyAuthor').value = '';
+                document.getElementById('btnTerminar').classList.add('visually-hidden');
+                cerrarReflexion();
+                renderGlobalCharacters();
+                renderMoments();
+                updateChart();
+            }
+        }
+
+        function toggleMode() {
+            isMusicMode = !isMusicMode;
+            const btn = document.getElementById('modeToggleBtn');
+            const appIcon = document.getElementById('appIcon');
+            const appTitle = document.getElementById('appTitle');
+            const titleInput = document.getElementById('storyTitle');
+            const authorInput = document.getElementById('storyAuthor');
+            const charLabel = document.getElementById('charLabel');
+            const titleIcon = document.getElementById('titleIcon');
+            const authorIcon = document.getElementById('authorIcon');
+            const timelineTitle = document.getElementById('timelineTitle');
+            const chartTitle = document.getElementById('chartTitle');
+
+            if (isMusicMode) {
+                btn.innerHTML = '🎵 Modo Música Activado';
+                btn.className = 'px-3 py-1.5 rounded-lg text-xs font-bold border bg-temp-hot text-white border-temp-hot hover:bg-temp-max shadow-sm flex items-center gap-1';
+                appIcon.innerText = "🎼";
+                appTitle.innerText = "Termómetro Musical";
+                titleIcon.innerText = "🎹";
+                authorIcon.innerText = "🎼";
+                titleInput.placeholder = "Título de la pieza musical...";
+                authorInput.placeholder = "Compositor / Compositora...";
+                charLabel.innerText = "🎭 Motivos (Leitmotivs)";
+                timelineTitle.innerText = "Secciones Musicales";
+                chartTitle.innerHTML = "📈 Curva de intensidad sonora";
+            } else {
+                btn.innerHTML = '📖 Modo Lectura';
+                btn.className = 'px-3 py-1.5 rounded-lg text-xs font-bold border border-base-border bg-base-bg text-base-text hover:bg-white shadow-sm flex items-center gap-1';
+                appIcon.innerText = "🌡️";
+                appTitle.innerText = "Termómetro Narrativo";
+                titleIcon.innerText = "📖";
+                authorIcon.innerText = "✍️";
+                titleInput.placeholder = "Título del cuento...";
+                authorInput.placeholder = "Autor / Autora...";
+                charLabel.innerText = "👥 Lista de Personajes";
+                timelineTitle.innerText = "Momentos de la historia";
+                chartTitle.innerHTML = "📈 Curva de intensidad";
+            }
+            
+            renderMoments();
+            if (!document.getElementById('finalReflectionArea').classList.contains('visually-hidden')) terminarYReflexionar();
+        }
+
+        function addGlobalCharacter() {
+            const input = document.getElementById('newCharacterInput');
+            const val = input.value.trim();
+            if (val && !parsedCharacters.includes(val)) {
+                parsedCharacters.push(val);
+                input.value = '';
+                saveData();
+                renderGlobalCharacters();
+                renderMoments(); 
+            }
+        }
+
+        function removeGlobalCharacter(char) {
+            parsedCharacters = parsedCharacters.filter(c => c !== char);
+            moments.forEach(m => { if(m.character === char) m.character = ''; });
+            saveData();
+            renderGlobalCharacters();
+            renderMoments();
+        }
+
+        function renderGlobalCharacters() {
+            const container = document.getElementById('characterTags');
+            container.innerHTML = parsedCharacters.map(c => 
+                `<span class="bg-white border border-base-border text-xs font-semibold px-2 py-1 rounded-md flex items-center gap-1">
+                    ${c} <button onclick="removeGlobalCharacter('${c}')" class="text-base-muted hover:text-temp-max ml-1">&times;</button>
+                </span>`
+            ).join('');
+        }
+
+        function addMoment() {
+            if (editingMomentId !== null) return;
+            document.getElementById('btnTerminar').classList.remove('visually-hidden');
+
+            const newMoment = {
+                id: Date.now(),
+                title: '', description: '', character: '', emotion: '',
+                temperature: moments.length > 0 ? moments[moments.length - 1].temperature : 20,
+                reflection: '', musicReflection: '',
+                dynamic: '', pitch: '', technique: '', 
+                isConfirmed: false 
+            };
+
+            moments.push(newMoment);
+            editingMomentId = newMoment.id;
+            saveData();
+            renderMoments();
+            updateChart();
+        }
+
+        function confirmMoment(id) {
+            const m = moments.find(x => x.id === id);
+            if (m) {
+                if (!m.title || !m.description) {
+                    alert("Agrega un título y descripción primero.");
+                    return;
+                }
+                m.isConfirmed = true;
+                editingMomentId = null; 
+                saveData();
+                renderMoments();
+                updateChart();
+            }
+        }
+
+        function editMoment(id) {
+            if (editingMomentId !== null && editingMomentId !== id) return;
+            const m = moments.find(x => x.id === id);
+            if (m) { m.isConfirmed = false; editingMomentId = id; renderMoments(); }
+        }
+
+        function deleteMoment(id) {
+            moments = moments.filter(x => x.id !== id);
+            if (editingMomentId === id) editingMomentId = null;
+            if(moments.length === 0) {
+                document.getElementById('btnTerminar').classList.add('visually-hidden');
+                document.getElementById('finalReflectionArea').classList.add('visually-hidden');
+            }
+            saveData();
+            renderMoments();
+            updateChart();
+        }
+        
+        function updateField(id, field, value) {
+            const m = moments.find(x => x.id === id);
+            if(m) { m[field] = value; saveData(); }
+        }
+
+        function selectEmotion(momentId, emotionId) {
+            const m = moments.find(x => x.id === momentId);
+            if(m && !m.isConfirmed) { m.emotion = emotionId; saveData(); renderMoments(); }
+        }
+
+        function onTemperatureChange(id, val) {
+            const num = parseInt(val);
+            const m = moments.find(x => x.id === id);
+            if(m) { m.temperature = num; saveData(); }
+            const labelEl = document.getElementById(`temp-label-${id}`);
+            if(labelEl) {
+                labelEl.innerText = `${num}° - ${getTempLabel(num)}`;
+                labelEl.style.color = getTempColor(num);
+            }
+            updateChart(); 
+        }
+
+        function renderMoments() {
+            const container = document.getElementById('momentsList');
+            const btnAdd = document.getElementById('btnAddMoment');
+            
+            if (moments.length === 0) {
+                container.innerHTML = `<div class="text-center mt-12"><p class="text-xl font-semibold">📍 ¿Dónde comienza la experiencia?</p></div>`;
+                return;
+            }
+
+            if (editingMomentId !== null) {
+                btnAdd.classList.add('opacity-50', 'cursor-not-allowed');
+                btnAdd.innerHTML = `⏳ Confirma el momento actual`;
+            } else {
+                btnAdd.classList.remove('opacity-50', 'cursor-not-allowed');
+                btnAdd.innerHTML = `➕ Agregar siguiente momento`;
+            }
+
+            container.innerHTML = '';
+
+            moments.forEach((m, index) => {
+                const isEditing = m.id === editingMomentId;
+                const card = document.createElement('div');
+                card.id = `moment-card-${m.id}`;
+                card.className = `border rounded-2xl transition-all duration-300 ${isEditing ? 'bg-white border-temp-medium/50 p-5 ring-1 ring-temp-medium/20 shadow-md' : 'bg-base-surface border-base-border p-4'} fade-in mb-4`;
+                const numStr = (index + 1).toString().padStart(2, '0');
+
+                if (isEditing) {
+                    let characterSelectHtml = '';
+                    if (parsedCharacters.length > 0) {
+                        const options = parsedCharacters.map(c => `<option value="${c}" ${m.character === c ? 'selected' : ''}>${c}</option>`).join('');
+                        characterSelectHtml = `
+                            <div class="mb-4">
+                                <label class="block text-xs font-bold text-base-muted uppercase mb-1">${isMusicMode ? '🎵 Motivo Principal' : '👤 Personaje Central'}</label>
+                                <select onchange="updateField(${m.id}, 'character', this.value)" class="w-full text-sm font-medium bg-base-bg border border-base-border rounded-xl p-2 outline-none">
+                                    <option value="">Seleccionar...</option>
+                                    ${options}
+                                </select>
+                            </div>
+                        `;
+                    }
+
+                    let musicFieldsHtml = '';
+                    if (isMusicMode) {
+                        musicFieldsHtml = `
+                            <div class="bg-temp-hot/5 border border-temp-hot/20 p-3 rounded-xl mb-4 space-y-3">
+                                <label class="block text-xs font-bold text-temp-hot uppercase">🎼 Parámetros de Interpretación</label>
+                                <div class="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label class="block text-[11px] font-bold text-base-muted uppercase mb-1">🔊 Dinámica</label>
+                                        <select onchange="updateField(${m.id}, 'dynamic', this.value)" class="w-full text-sm bg-white border border-base-border rounded-lg p-1.5 outline-none">
+                                            <option value="">Elegir...</option>
+                                            <option value="Pianissimo (pp)" ${m.dynamic === 'Pianissimo (pp)' ? 'selected' : ''}>Pianissimo (pp)</option>
+                                            <option value="Piano (p)" ${m.dynamic === 'Piano (p)' ? 'selected' : ''}>Piano (p)</option>
+                                            <option value="Mezzo-piano (mp)" ${m.dynamic === 'Mezzo-piano (mp)' ? 'selected' : ''}>Mezzo-piano (mp)</option>
+                                            <option value="Mezzo-forte (mf)" ${m.dynamic === 'Mezzo-forte (mf)' ? 'selected' : ''}>Mezzo-forte (mf)</option>
+                                            <option value="Forte (f)" ${m.dynamic === 'Forte (f)' ? 'selected' : ''}>Forte (f)</option>
+                                            <option value="Fortissimo (ff)" ${m.dynamic === 'Fortissimo (ff)' ? 'selected' : ''}>Fortissimo (ff)</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="block text-[11px] font-bold text-base-muted uppercase mb-1">📏 Registro / Altura</label>
+                                        <select onchange="updateField(${m.id}, 'pitch', this.value)" class="w-full text-sm bg-white border border-base-border rounded-lg p-1.5 outline-none">
+                                            <option value="">Elegir...</option>
+                                            <option value="Grave" ${m.pitch === 'Grave' ? 'selected' : ''}>Grave</option>
+                                            <option value="Medio" ${m.pitch === 'Medio' ? 'selected' : ''}>Medio</option>
+                                            <option value="Agudo" ${m.pitch === 'Agudo' ? 'selected' : ''}>Agudo</option>
+                                            <option value="Extremo" ${m.pitch === 'Extremo' ? 'selected' : ''}>Extremo</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-span-2">
+                                        <label class="block text-[11px] font-bold text-base-muted uppercase mb-1">🎶 Técnica / Recurso</label>
+                                        <select onchange="updateField(${m.id}, 'technique', this.value)" class="w-full text-sm bg-white border border-base-border rounded-lg p-1.5 outline-none">
+                                            <option value="">Elegir...</option>
+                                            <option value="Escala Pentatónica" ${m.technique === 'Escala Pentatónica' ? 'selected' : ''}>Escala Pentatónica</option>
+                                            <option value="Escala Menor / Tristeza" ${m.technique === 'Escala Menor / Tristeza' ? 'selected' : ''}>Escala Menor / Tristeza</option>
+                                            <option value="Cluster / Disonancia" ${m.technique === 'Cluster / Disonancia' ? 'selected' : ''}>Cluster / Disonancia</option>
+                                            <option value="Melodía Cantabile" ${m.technique === 'Melodía Cantabile' ? 'selected' : ''}>Melodía Cantabile</option>
+                                            <option value="Ostinato" ${m.technique === 'Ostinato' ? 'selected' : ''}>Ostinato</option>
+                                            <option value="Staccato / Picado" ${m.technique === 'Staccato / Picado' ? 'selected' : ''}>Staccato / Picado</option>
+                                            <option value="Silencio / Pausa dramática" ${m.technique === 'Silencio / Pausa dramática' ? 'selected' : ''}>Silencio / Pausa dramática</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }
+
+                    const emotionsHTML = EMOTIONS.map(e => `
+                        <button type="button" onclick="selectEmotion(${m.id}, '${e.id}')"
+                            class="px-3 py-1.5 rounded-xl border text-sm flex items-center gap-1.5 ${m.emotion === e.id ? 'bg-base-text text-white' : 'bg-base-surface'} hover:bg-base-border transition-colors">
+                            <span>${e.icon}</span> <span>${e.label}</span>
+                        </button>
+                    `).join('');
+
+                    card.innerHTML = `
+                        <div class="flex items-center justify-between mb-4">
+                            <span class="text-xs font-bold bg-base-bg text-base-muted px-2 py-1 rounded-md uppercase border border-base-border">📝 Editando ${numStr}</span>
+                            <button onclick="deleteMoment(${m.id})" class="text-base-muted hover:text-temp-max text-xs font-semibold px-2 py-1">🗑️ Eliminar</button>
+                        </div>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-xs font-bold text-base-muted uppercase mb-1">📌 Título</label>
+                                <input type="text" value="${m.title}" oninput="updateField(${m.id}, 'title', this.value)" class="w-full text-base font-semibold bg-base-bg border border-base-border rounded-xl p-2 outline-none focus:border-temp-hot">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-base-muted uppercase mb-1">📝 Descripción / Carácter</label>
+                                <textarea rows="2" oninput="updateField(${m.id}, 'description', this.value)" class="w-full text-sm font-medium bg-base-bg border border-base-border rounded-xl p-2 resize-none outline-none focus:border-temp-hot">${m.description}</textarea>
+                            </div>
+                            
+                            ${characterSelectHtml}
+                            ${musicFieldsHtml}
+
+                            <div>
+                                <label class="block text-xs font-bold text-base-muted uppercase mb-2">😊 Emoción</label>
+                                <div class="flex flex-wrap gap-2">${emotionsHTML}</div>
+                            </div>
+                            <div class="bg-base-bg rounded-xl p-4 border border-base-border">
+                                <div class="flex justify-between items-center mb-3">
+                                    <label class="text-xs font-bold text-base-muted uppercase">Intensidad</label>
+                                    <span id="temp-label-${m.id}" class="text-sm font-bold bg-white px-2 py-1 rounded-lg border border-base-border" style="color: ${getTempColor(m.temperature)}">${m.temperature}°</span>
+                                </div>
+                                <input type="range" min="1" max="100" value="${m.temperature}" oninput="onTemperatureChange(${m.id}, this.value)" id="slider-${m.id}" />
+                            </div>
+                            <button onclick="confirmMoment(${m.id})" class="w-full py-3 bg-base-text hover:bg-black text-white rounded-xl text-sm font-bold transition-colors">
+                                ✔️ Confirmar en la curva
+                            </button>
+                        </div>
+                    `;
+                } else {
+                    const charDisplay = m.character ? `<span class="bg-base-bg border border-base-border px-2 py-0.5 rounded-md text-xs font-medium text-base-muted">${m.character}</span>` : '';
+                    const emotionObj = EMOTIONS.find(e => e.id === m.emotion);
+                    const emoDisplay = emotionObj ? `<span class="text-xs text-base-muted font-medium">${emotionObj.icon} ${emotionObj.label}</span>` : '';
+                    
+                    let musicBadgesHtml = '';
+                    let reflectionInputArea = '';
+                    
+                    if (isMusicMode) {
+                        let badges = [];
+                        if (m.dynamic || m.pitch) badges.push(`🔊 Dinámica: ${m.dynamic || '-'} | Altura: ${m.pitch || '-'}`);
+                        if (m.technique) badges.push(`💥 Técnica: ${m.technique}`);
+
+                        if (badges.length > 0) {
+                            musicBadgesHtml = `<div class="flex flex-col gap-1 mt-3 mb-2">
+                                ${badges.map(b => `<span class="text-xs font-semibold bg-temp-hot/10 text-temp-max border border-temp-hot/20 px-2 py-1.5 rounded-md">${b}</span>`).join('')}
+                            </div>`;
+                        } else {
+                            musicBadgesHtml = `<p class="text-[11px] text-temp-max font-medium italic mt-2 mb-2">⚠️ Faltan definir parámetros musicales (Presiona Editar)</p>`;
+                        }
+
+                        reflectionInputArea = `
+                            <div class="bg-base-surface p-3 rounded-lg text-[13px] text-base-muted mb-3 border-l-4 border-base-border">
+                                <strong class="text-base-text">📖 Insumo Literario:</strong> <em>"${m.description}"</em>
+                            </div>
+                            <div class="bg-base-bg rounded-xl p-3 border border-base-border">
+                                <textarea rows="2" oninput="updateField(${m.id}, 'musicReflection', this.value)" placeholder="Anota tus decisiones de instrumentación..." class="w-full text-sm font-medium bg-white border border-base-border rounded-lg p-2 resize-none outline-none focus:border-temp-hot">${m.musicReflection || ''}</textarea>
+                            </div>
+                        `;
+                    } else {
+                        reflectionInputArea = `
+                            <p class="text-sm text-base-muted mb-3 bg-white p-3 rounded-lg border border-base-border leading-relaxed">${m.description || 'Sin descripción'}</p>
+                            <div class="bg-base-bg rounded-xl p-3 border border-base-border mt-2">
+                                <textarea rows="1" oninput="updateField(${m.id}, 'reflection', this.value)" placeholder="Interpretación literaria..." class="w-full text-sm font-medium bg-white border border-base-border rounded-lg p-2 resize-none outline-none focus:border-temp-hot">${m.reflection || ''}</textarea>
+                            </div>
+                        `;
+                    }
+
+                    card.innerHTML = `
+                        <div class="flex gap-4">
+                            <div class="flex flex-col items-center pt-1 shrink-0">
+                                <div class="w-10 h-10 rounded-full flex items-center justify-center font-display font-bold text-white shadow-sm border-2 border-white" style="background-color: ${getTempColor(m.temperature)}">${numStr}</div>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <div class="flex justify-between items-start mb-1">
+                                    <h4 class="font-bold text-base-text text-base">${m.title || 'Sin Título'}</h4>
+                                    <button onclick="editMoment(${m.id})" class="text-base-muted hover:text-temp-hot text-xs font-semibold px-2 py-1 bg-white border border-base-border rounded-lg hover:bg-base-bg transition-colors shrink-0">✏️ Editar</button>
+                                </div>
+                                <div class="flex flex-wrap items-center gap-2 mb-2">
+                                    ${emoDisplay} ${charDisplay}
+                                </div>
+                                ${musicBadgesHtml}
+                                ${reflectionInputArea}
+                            </div>
+                        </div>
+                    `;
+                }
+                container.appendChild(card);
+            });
+        }
+
+        function terminarYReflexionar() {
+            document.getElementById('finalReflectionArea').classList.remove('visually-hidden');
+            document.getElementById('finalReflectionArea').scrollIntoView({ behavior: 'smooth', block: 'end' });
+        }
+
+        function cerrarReflexion() {
+            document.getElementById('finalReflectionArea').classList.add('visually-hidden');
+        }
+
+        function initChart() {
+            const ctx = document.getElementById('thermometerChart').getContext('2d');
+            Chart.defaults.font.family = 'Plus Jakarta Sans';
+            chartInstance = new Chart(ctx, {
+                type: 'line',
+                data: getChartData(),
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: { 
+                        y: { 
+                            min: 0, max: 100,
+                            grid: { color: '#E9DFD3', strokeDash: [4, 4] }
+                        },
+                        x: { grid: { display: false } }
+                    },
+                    elements: { line: { borderWidth: 3 } }
+                }
+            });
+        }
+
+        function getChartData() {
+            const data = moments.map(m => m.temperature);
+            return {
+                labels: moments.map((_, i) => `${i + 1}`),
+                datasets: [{
+                    data: data.length > 0 ? data : [0],
+                    borderColor: '#E9DFD3',
+                    fill: false,
+                    tension: 0.4,
+                    pointBackgroundColor: data.map(val => getTempColor(val)),
+                    pointBorderColor: '#FFFDF9',
+                    pointBorderWidth: 2,
+                    pointRadius: 6
+                }]
+            };
+        }
+
+        function updateChart() {
+            if(!chartInstance) return;
+            chartInstance.data = getChartData();
+            chartInstance.update();
+        }
+
+        window.onload = () => { initChart(); loadData(); };
+    </script>
+</body>
+</html>
