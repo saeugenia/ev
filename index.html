@@ -177,6 +177,9 @@
                     <option value="Música">Música</option>
                     <option value="Otra">Otra</option>
                 </select>
+                <button onclick="openHistoryModal()" title="Ver historial de modificaciones" class="text-xs bg-white hover:bg-base-border text-base-text border border-base-border px-2 py-0.5 rounded-lg font-bold transition-colors flex items-center gap-1 shadow-sm">
+                    📜 Historial
+                </button>
             </div>
         </div>
         
@@ -446,8 +449,8 @@
             } else {
                 // Mostrar desde el más reciente al más antiguo
                 container.innerHTML = historyLog.slice().reverse().map(log => `
-                    <div class="bg-white p-3 rounded-lg border border-base-border shadow-sm flex flex-col gap-1">
-                        <div class="flex justify-between items-start">
+                    <div class="bg-white p-3 rounded-lg border border-base-border shadow-sm flex flex-col gap-1 relative">
+                        <div class="flex justify-between items-start pr-6">
                             <span class="text-sm font-bold text-base-text">${log.title || 'Sesión sin título'}</span>
                             <span class="text-[10px] bg-base-bg border border-base-border px-2 py-0.5 rounded-md text-base-muted">${log.timestamp}</span>
                         </div>
@@ -455,10 +458,19 @@
                             <span class="text-xs font-semibold text-temp-hot bg-temp-hot/10 px-2 py-0.5 rounded border border-temp-hot/20">📅 ${log.date}</span>
                             <span class="text-xs font-semibold text-temp-max bg-temp-max/10 px-2 py-0.5 rounded border border-temp-max/20">📚 ${log.subject}</span>
                         </div>
+                        <button onclick="deleteHistoryItem(${log.id})" title="Eliminar este registro" class="absolute top-2 right-2 text-base-muted hover:text-temp-max hover:bg-red-50 text-xs font-bold w-6 h-6 rounded-md border border-base-border flex items-center justify-center transition-colors">
+                            ✕
+                        </button>
                     </div>
                 `).join('');
             }
             document.getElementById('historyModal').classList.remove('visually-hidden');
+        }
+
+        function deleteHistoryItem(id) {
+            historyLog = historyLog.filter(log => log.id !== id);
+            saveDataLocal();
+            openHistoryModal();
         }
 
         function closeHistoryModal() {
