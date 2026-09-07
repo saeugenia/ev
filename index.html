@@ -590,7 +590,7 @@
                 const isEditing = m.id === editingMomentId;
                 const card = document.createElement('div');
                 card.id = `moment-card-${m.id}`;
-                card.className = `border rounded-2xl transition-all duration-300 ${isEditing ? 'bg-white border-temp-medium/50 p-5 ring-1 ring-temp-medium/20 shadow-md' : 'bg-base-surface border-base-border p-4'} fade-in mb-4`;
+                card.className = `border rounded-2xl transition-all duration-300 relative ${isEditing ? 'bg-white border-temp-medium/50 p-5 ring-1 ring-temp-medium/20 shadow-md' : 'bg-base-surface border-base-border p-4'} fade-in mb-4`;
                 const numStr = (index + 1).toString().padStart(2, '0');
 
                 if (isEditing) {
@@ -661,7 +661,7 @@
                     card.innerHTML = `
                         <div class="flex items-center justify-between mb-4">
                             <span class="text-xs font-bold bg-base-bg text-base-muted px-2 py-1 rounded-md uppercase border border-base-border">📝 Editando ${numStr}</span>
-                            <button onclick="deleteMoment(${m.id})" class="text-base-muted hover:text-temp-max text-xs font-semibold px-2 py-1">🗑️ Eliminar</button>
+                            <button onclick="deleteMoment(${m.id})" title="Eliminar momento" class="text-base-muted hover:text-temp-max hover:bg-red-50 text-xs font-bold w-7 h-7 rounded-lg border border-base-border flex items-center justify-center transition-colors">✕</button>
                         </div>
                         <div class="space-y-4">
                             <div>
@@ -736,9 +736,12 @@
                                 <div class="w-10 h-10 rounded-full flex items-center justify-center font-display font-bold text-white shadow-sm border-2 border-white" style="background-color: ${getTempColor(m.temperature)}">${numStr}</div>
                             </div>
                             <div class="flex-1 min-w-0">
-                                <div class="flex justify-between items-start mb-1">
+                                <div class="flex justify-between items-start mb-1 gap-2">
                                     <h4 class="font-bold text-base-text text-base">${m.title || 'Sin Título'}</h4>
-                                    <button onclick="editMoment(${m.id})" class="text-base-muted hover:text-temp-hot text-xs font-semibold px-2 py-1 bg-white border border-base-border rounded-lg hover:bg-base-bg transition-colors shrink-0">✏️ Editar</button>
+                                    <div class="flex items-center gap-1 shrink-0">
+                                        <button onclick="editMoment(${m.id})" class="text-base-muted hover:text-temp-hot text-xs font-semibold px-2 py-1 bg-white border border-base-border rounded-lg hover:bg-base-bg transition-colors shrink-0">✏️ Editar</button>
+                                        <button onclick="deleteMoment(${m.id})" title="Eliminar momento" class="text-base-muted hover:text-temp-max hover:bg-red-50 text-xs font-bold w-7 h-7 rounded-lg border border-base-border flex items-center justify-center transition-colors shrink-0">✕</button>
+                                    </div>
                                 </div>
                                 <div class="flex flex-wrap items-center gap-2 mb-2">
                                     ${emoDisplay} ${charDisplay}
