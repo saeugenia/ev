@@ -117,6 +117,20 @@
         </div>
     </div>
 
+    <!-- Modal de Historial -->
+    <div id="historyModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 visually-hidden">
+        <div class="bg-base-surface border border-base-border rounded-3xl p-6 md:p-8 max-w-lg w-full shadow-2xl space-y-4 fade-in flex flex-col max-h-[80vh]">
+            <div class="flex justify-between items-center">
+                <h2 class="font-display text-xl font-semibold flex items-center gap-2">⏱️ Historial de Registros</h2>
+                <button onclick="closeHistoryModal()" class="text-base-muted hover:text-temp-max font-bold text-2xl leading-none">&times;</button>
+            </div>
+            <p class="text-xs text-base-muted font-medium">Registro de estados guardados manualmente en este curso. Cada entrada muestra la fecha y la asignatura.</p>
+            <div id="historyList" class="flex-1 overflow-y-auto space-y-3 bg-base-bg p-4 rounded-xl border border-base-border">
+                <span class="text-xs text-base-muted italic">No hay registros guardados aún...</span>
+            </div>
+        </div>
+    </div>
+
     <!-- Encabezado Principal -->
     <header class="bg-base-surface border-b border-base-border py-4 px-6 md:px-8 shrink-0 z-10 shadow-sm flex flex-col md:flex-row gap-6 justify-between items-start">
         <div class="flex-shrink-0 flex flex-col items-start gap-2">
@@ -137,6 +151,10 @@
 
                 <button onclick="openSessionModal()" class="text-xs font-bold bg-white text-base-text border border-base-border hover:bg-base-bg px-3 py-1.5 rounded-lg transition-colors shadow-sm flex items-center gap-1">
                     🔀 Cambiar Sesión
+                </button>
+
+                <button onclick="openHistoryModal()" class="text-xs font-bold bg-base-bg text-base-text border border-base-border hover:bg-white px-3 py-1.5 rounded-lg transition-colors shadow-sm flex items-center gap-1">
+                    ⏱️ Historial
                 </button>
 
                 <button onclick="exportData()" class="text-xs font-bold bg-base-text text-white hover:bg-black px-3 py-1.5 rounded-lg transition-colors shadow-sm flex items-center gap-1">
@@ -273,6 +291,7 @@
         let currentSessionId = null;
         let autoSaveTimer = null;
         let unsubscribeFirestore = null;
+        let historyLog = [];
 
         const getTempColor = (val) => {
             if(val <= 30) return '#4DB6AC'; 
@@ -341,6 +360,7 @@
                     if (editingMomentId === null) {
                         moments = data.moments || [];
                         parsedCharacters = data.parsedCharacters || [];
+                        historyLog = data.historyLog || [];
                         document.getElementById('storyTitle').value = data.title || '';
                         document.getElementById('storyAuthor').value = data.author || '';
                         
@@ -374,13 +394,29 @@
             const statusEl = document.getElementById('saveStatus');
             if (statusEl) statusEl.innerText = isAuto ? 'Autoguardando...' : 'Guardando...';
 
+            const currentDate = document.getElementById('sessionDate').value || new Date().toISOString().split('T')[0];
+            const currentClass = document.getElementById('sessionClass').value;
+            const currentTitle = document.getElementById('storyTitle').value;
+
+            // Añadir un nuevo registro al historial si es un guardado manual
+            if (!isAuto) {
+                historyLog.push({
+                    id: Date.now(),
+                    date: currentDate,
+                    subject: currentClass,
+                    title: currentTitle,
+                    timestamp: new Date().toLocaleString()
+                });
+            }
+
             const dataToSave = {
                 moments: moments,
                 parsedCharacters: parsedCharacters,
-                title: document.getElementById('storyTitle').value,
+                title: currentTitle,
                 author: document.getElementById('storyAuthor').value,
-                sessionDate: document.getElementById('sessionDate').value,
-                sessionClass: document.getElementById('sessionClass').value,
+                sessionDate: currentDate,
+                sessionClass: currentClass,
+                historyLog: historyLog,
                 updatedAt: firebase.firestore.FieldValue.serverTimestamp()
             };
 
@@ -401,6 +437,32 @@
                         alert(`❌ Error al conectar con Firebase:\n${err.message}`);
                     }
                 });
+        }
+
+        function openHistoryModal() {
+            const container = document.getElementById('historyList');
+            if (historyLog.length === 0) {
+                container.innerHTML = '<span class="text-xs text-base-muted italic">No hay registros guardados aún. Presiona "Guardar en Nube" para crear uno.</span>';
+            } else {
+                // Mostrar desde el más reciente al más antiguo
+                container.innerHTML = historyLog.slice().reverse().map(log => `
+                    <div class="bg-white p-3 rounded-lg border border-base-border shadow-sm flex flex-col gap-1">
+                        <div class="flex justify-between items-start">
+                            <span class="text-sm font-bold text-base-text">${log.title || 'Sesión sin título'}</span>
+                            <span class="text-[10px] bg-base-bg border border-base-border px-2 py-0.5 rounded-md text-base-muted">${log.timestamp}</span>
+                        </div>
+                        <div class="flex gap-2 items-center mt-1">
+                            <span class="text-xs font-semibold text-temp-hot bg-temp-hot/10 px-2 py-0.5 rounded border border-temp-hot/20">📅 ${log.date}</span>
+                            <span class="text-xs font-semibold text-temp-max bg-temp-max/10 px-2 py-0.5 rounded border border-temp-max/20">📚 ${log.subject}</span>
+                        </div>
+                    </div>
+                `).join('');
+            }
+            document.getElementById('historyModal').classList.remove('visually-hidden');
+        }
+
+        function closeHistoryModal() {
+            document.getElementById('historyModal').classList.add('visually-hidden');
         }
 
         function startAutoSave() {
