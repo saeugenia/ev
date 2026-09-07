@@ -131,7 +131,7 @@
                 
                 <div class="h-4 w-px bg-base-border mx-1 hidden sm:block"></div>
                 
-                <button onclick="saveToFirebase()" class="text-xs font-bold bg-temp-hot text-white hover:bg-temp-max px-3 py-1.5 rounded-lg transition-colors shadow-sm flex items-center gap-1">
+                <button onclick="saveToFirebase(false)" class="text-xs font-bold bg-temp-hot text-white hover:bg-temp-max px-3 py-1.5 rounded-lg transition-colors shadow-sm flex items-center gap-1">
                     ☁️ Guardar en Nube
                 </button>
 
@@ -331,7 +331,7 @@
                         if (moments.length > 0) document.getElementById('btnTerminar').classList.remove('visually-hidden');
                     }
                 } else {
-                    saveToFirebase();
+                    saveToFirebase(true);
                 }
             });
 
@@ -339,7 +339,14 @@
         }
 
         function saveToFirebase(isAuto = false) {
-            if (!currentSessionId) return;
+            if (!currentSessionId) {
+                if (!isAuto) {
+                    alert("⚠️ Primero debes seleccionar o crear una sesión/curso.");
+                    openSessionModal();
+                }
+                return;
+            }
+
             const statusEl = document.getElementById('saveStatus');
             if (statusEl) statusEl.innerText = isAuto ? 'Autoguardando...' : 'Guardando...';
 
@@ -356,10 +363,17 @@
                     const now = new Date();
                     const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                     if (statusEl) statusEl.innerText = `☁️ Guardado (${timeStr})`;
+                    
+                    if (!isAuto) {
+                        alert(`✅ ¡Conexión con Firebase exitosa!\n\nLos datos del curso "${currentSessionId}" se han guardado correctamente en la nube.`);
+                    }
                 })
                 .catch(err => {
                     console.error("Error guardando:", err);
                     if (statusEl) statusEl.innerText = '❌ Error al guardar';
+                    if (!isAuto) {
+                        alert(`❌ Error al conectar con Firebase:\n${err.message}`);
+                    }
                 });
         }
 
@@ -371,7 +385,7 @@
         }
 
         function saveDataLocal() {
-            saveToFirebase();
+            saveToFirebase(true);
         }
 
         function exportData() {
