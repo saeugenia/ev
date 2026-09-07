@@ -8,6 +8,11 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
+    <!-- Firebase SDKs (Compat) -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -76,6 +81,43 @@
 
 <body class="h-screen w-screen flex flex-col font-sans overflow-hidden">
 
+    <!-- Modal de Selección de Sesión / Curso -->
+    <div id="sessionModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-base-surface border border-base-border rounded-3xl p-6 md:p-8 max-w-md w-full shadow-2xl space-y-6 fade-in">
+            <div class="text-center space-y-2">
+                <span class="text-4xl">🏫</span>
+                <h2 class="font-display text-2xl font-semibold">Seleccionar Sesión / Curso</h2>
+                <p class="text-xs text-base-muted font-medium">Elige una clase existente o crea una nueva para sincronizar en tiempo real con Firebase.</p>
+            </div>
+
+            <div class="space-y-3">
+                <label class="block text-xs font-bold text-base-muted uppercase">Sesión Principal</label>
+                <button onclick="selectSession('6to A')" class="w-full py-3.5 px-4 bg-temp-hot hover:bg-temp-max text-white rounded-xl font-bold text-base shadow-sm transition-all flex items-center justify-between">
+                    <span>📚 6to A</span>
+                    <span class="text-xs font-normal bg-white/20 px-2 py-0.5 rounded-md">Entrar</span>
+                </button>
+            </div>
+
+            <div class="space-y-3">
+                <label class="block text-xs font-bold text-base-muted uppercase">Crear Nueva Sesión</label>
+                <div class="flex gap-2">
+                    <input type="text" id="newSessionInput" placeholder="Ej: 7mo B, 5to C..." class="flex-1 bg-base-bg border border-base-border rounded-xl px-3 py-2 text-sm font-semibold outline-none focus:border-temp-hot">
+                    <button onclick="createSession()" class="bg-base-text hover:bg-black text-white text-xs font-bold px-4 py-2 rounded-xl transition-colors">
+                        Crear
+                    </button>
+                </div>
+            </div>
+
+            <div class="border-t border-base-border pt-4">
+                <label class="block text-xs font-bold text-base-muted uppercase mb-2">Otras Sesiones Guardadas</label>
+                <div id="sessionsList" class="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
+                    <span class="text-xs text-base-muted italic">Cargando sesiones...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Encabezado Principal -->
     <header class="bg-base-surface border-b border-base-border py-4 px-6 md:px-8 shrink-0 z-10 shadow-sm flex flex-col md:flex-row gap-6 justify-between items-start">
         <div class="flex-shrink-0 flex flex-col items-start gap-2">
             <h1 class="font-display text-2xl md:text-3xl font-semibold text-base-text flex items-center gap-2">
@@ -89,18 +131,23 @@
                 
                 <div class="h-4 w-px bg-base-border mx-1 hidden sm:block"></div>
                 
+                <button onclick="saveToFirebase()" class="text-xs font-bold bg-temp-hot text-white hover:bg-temp-max px-3 py-1.5 rounded-lg transition-colors shadow-sm flex items-center gap-1">
+                    ☁️ Guardar en Nube
+                </button>
+
+                <button onclick="openSessionModal()" class="text-xs font-bold bg-white text-base-text border border-base-border hover:bg-base-bg px-3 py-1.5 rounded-lg transition-colors shadow-sm flex items-center gap-1">
+                    🔀 Cambiar Sesión
+                </button>
+
                 <button onclick="exportData()" class="text-xs font-bold bg-base-text text-white hover:bg-black px-3 py-1.5 rounded-lg transition-colors shadow-sm flex items-center gap-1">
                     📤 Exportar
                 </button>
-                
-                <label class="text-xs font-bold bg-white text-base-text border border-base-border hover:bg-base-bg px-3 py-1.5 rounded-lg transition-colors shadow-sm cursor-pointer flex items-center gap-1 mb-0">
-                    📥 Importar
-                    <input type="file" accept=".json" onchange="importData(event)" class="hidden">
-                </label>
 
-                <button onclick="clearData()" class="text-[11px] font-bold text-temp-max hover:bg-temp-max/10 px-2 py-1.5 rounded-lg border border-temp-max/20 ml-1">
-                    🗑️ Borrar todo
-                </button>
+                <span id="currentSessionBadge" class="text-xs font-bold bg-base-bg border border-base-border text-base-text px-2.5 py-1.5 rounded-lg">
+                    Curso: ---
+                </span>
+
+                <span id="saveStatus" class="text-[11px] font-semibold text-base-muted ml-1"></span>
             </div>
         </div>
         
@@ -108,11 +155,11 @@
             <div class="flex flex-col gap-2 w-full md:w-auto">
                 <div class="flex items-center gap-2 bg-base-bg border border-base-border rounded-xl px-3 py-1.5">
                     <span id="titleIcon" class="text-lg">📖</span>
-                    <input type="text" id="storyTitle" oninput="saveData()" placeholder="Título del cuento..." class="bg-transparent border-none outline-none text-sm font-semibold w-full md:w-48">
+                    <input type="text" id="storyTitle" oninput="saveDataLocal()" placeholder="Título del cuento..." class="bg-transparent border-none outline-none text-sm font-semibold w-full md:w-48">
                 </div>
                 <div class="flex items-center gap-2 bg-base-bg border border-base-border rounded-xl px-3 py-1.5">
                     <span id="authorIcon" class="text-lg">✍️</span>
-                    <input type="text" id="storyAuthor" oninput="saveData()" placeholder="Autor / Autora..." class="bg-transparent border-none outline-none text-sm font-medium w-full md:w-48">
+                    <input type="text" id="storyAuthor" oninput="saveDataLocal()" placeholder="Autor / Autora..." class="bg-transparent border-none outline-none text-sm font-medium w-full md:w-48">
                 </div>
             </div>
             
@@ -170,6 +217,24 @@
     </main>
 
     <script>
+        // Configuración de Firebase
+        const firebaseConfig = {
+            apiKey: "AIzaSyALYArJCNbwDtBKyZXEGt6pxpp0K9uIVF8",
+            authDomain: "termometronarrativo.firebaseapp.com",
+            projectId: "termometronarrativo",
+            storageBucket: "termometronarrativo.firebasestorage.app",
+            messagingSenderId: "987287921164",
+            appId: "1:987287921164:web:74325a34a64df9d232c429",
+            measurementId: "G-KYLZ9QQXD8"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+        const auth = firebase.auth();
+
+        auth.signInAnonymously().catch(err => console.error("Error Auth:", err));
+
+        // Emociones Ampliadas
         const EMOTIONS = [
             { id: 'calma', icon: '😌', label: 'Calma' },
             { id: 'alegria', icon: '😊', label: 'Alegría' },
@@ -177,8 +242,26 @@
             { id: 'asombro', icon: '😲', label: 'Asombro' },
             { id: 'suspenso', icon: '😰', label: 'Suspenso' },
             { id: 'rabia', icon: '😡', label: 'Rabia' },
-            { id: 'miedo', icon: '😨', label: 'Miedo' }
+            { id: 'miedo', icon: '😨', label: 'Miedo' },
+            { id: 'amor', icon: '😍', label: 'Amor' },
+            { id: 'confusion', icon: '😕', label: 'Confusión' },
+            { id: 'esperanza', icon: '🌱', label: 'Esperanza' },
+            { id: 'decepcion', icon: '😞', label: 'Decepción' },
+            { id: 'valentia', icon: '🦁', label: 'Valentía' },
+            { id: 'culpa', icon: '😳', label: 'Culpa' },
+            { id: 'nostalgia', icon: '🍂', label: 'Nostalgia' },
+            { id: 'euforia', icon: '🤩', label: 'Euforia' },
+            { id: 'asco', icon: '🤢', label: 'Asco' }
         ];
+
+        let moments = [];
+        let chartInstance = null;
+        let parsedCharacters = [];
+        let editingMomentId = null; 
+        let isMusicMode = false; 
+        let currentSessionId = null;
+        let autoSaveTimer = null;
+        let unsubscribeFirestore = null;
 
         const getTempColor = (val) => {
             if(val <= 30) return '#4DB6AC'; 
@@ -194,11 +277,102 @@
             return '¡Fuego! / Clímax';
         };
 
-        let moments = [];
-        let chartInstance = null;
-        let parsedCharacters = [];
-        let editingMomentId = null; 
-        let isMusicMode = false; 
+        // --- Manejo de Firebase & Sesiones ---
+        function loadAvailableSessions() {
+            db.collection('sessions').get().then(snapshot => {
+                const container = document.getElementById('sessionsList');
+                if (snapshot.empty) {
+                    container.innerHTML = '<span class="text-xs text-base-muted italic">No hay otras sesiones guardadas aún.</span>';
+                    return;
+                }
+                let html = '';
+                snapshot.forEach(doc => {
+                    if (doc.id !== '6to A') {
+                        html += `<button onclick="selectSession('${doc.id}')" class="px-3 py-1.5 bg-base-bg border border-base-border text-xs font-semibold rounded-lg hover:bg-base-border">${doc.id}</button>`;
+                    }
+                });
+                container.innerHTML = html || '<span class="text-xs text-base-muted italic">No hay otras sesiones guardadas aún.</span>';
+            });
+        }
+
+        function openSessionModal() {
+            loadAvailableSessions();
+            document.getElementById('sessionModal').classList.remove('hidden');
+        }
+
+        function createSession() {
+            const input = document.getElementById('newSessionInput');
+            const name = input.value.trim();
+            if (name) {
+                selectSession(name);
+                input.value = '';
+            }
+        }
+
+        function selectSession(sessionId) {
+            currentSessionId = sessionId;
+            document.getElementById('currentSessionBadge').innerText = `Curso: ${sessionId}`;
+            document.getElementById('sessionModal').classList.add('hidden');
+
+            if (unsubscribeFirestore) unsubscribeFirestore();
+
+            unsubscribeFirestore = db.collection('sessions').doc(sessionId).onSnapshot(doc => {
+                if (doc.exists) {
+                    const data = doc.data();
+                    if (editingMomentId === null) {
+                        moments = data.moments || [];
+                        parsedCharacters = data.parsedCharacters || [];
+                        document.getElementById('storyTitle').value = data.title || '';
+                        document.getElementById('storyAuthor').value = data.author || '';
+                        
+                        renderGlobalCharacters();
+                        renderMoments();
+                        updateChart();
+                        if (moments.length > 0) document.getElementById('btnTerminar').classList.remove('visually-hidden');
+                    }
+                } else {
+                    saveToFirebase();
+                }
+            });
+
+            startAutoSave();
+        }
+
+        function saveToFirebase(isAuto = false) {
+            if (!currentSessionId) return;
+            const statusEl = document.getElementById('saveStatus');
+            if (statusEl) statusEl.innerText = isAuto ? 'Autoguardando...' : 'Guardando...';
+
+            const dataToSave = {
+                moments: moments,
+                parsedCharacters: parsedCharacters,
+                title: document.getElementById('storyTitle').value,
+                author: document.getElementById('storyAuthor').value,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            };
+
+            db.collection('sessions').doc(currentSessionId).set(dataToSave, { merge: true })
+                .then(() => {
+                    const now = new Date();
+                    const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                    if (statusEl) statusEl.innerText = `☁️ Guardado (${timeStr})`;
+                })
+                .catch(err => {
+                    console.error("Error guardando:", err);
+                    if (statusEl) statusEl.innerText = '❌ Error al guardar';
+                });
+        }
+
+        function startAutoSave() {
+            if (autoSaveTimer) clearInterval(autoSaveTimer);
+            autoSaveTimer = setInterval(() => {
+                saveToFirebase(true);
+            }, 60000); // Autoguardado cada 1 minuto
+        }
+
+        function saveDataLocal() {
+            saveToFirebase();
+        }
 
         function exportData() {
             const dataToSave = {
@@ -215,89 +389,11 @@
             const a = document.createElement('a');
             a.href = url;
             let fileName = dataToSave.title ? dataToSave.title.replace(/\s+/g, '_') : 'Sesion';
-            a.download = `Termometro_${fileName}.json`;
+            a.download = `Termometro_${currentSessionId || 'Sesion'}_${fileName}.json`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
-        }
-
-        function importData(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                try {
-                    const importedData = JSON.parse(e.target.result);
-                    
-                    moments = importedData.moments || [];
-                    parsedCharacters = importedData.parsedCharacters || [];
-                    document.getElementById('storyTitle').value = importedData.title || '';
-                    document.getElementById('storyAuthor').value = importedData.author || '';
-                    
-                    editingMomentId = null; 
-                    saveData();
-                    
-                    renderGlobalCharacters();
-                    renderMoments();
-                    updateChart();
-                    
-                    if (moments.length > 0) {
-                        document.getElementById('btnTerminar').classList.remove('visually-hidden');
-                    }
-                    
-                    alert("✅ ¡Archivo cargado con éxito!");
-                } catch (error) {
-                    alert("❌ Hubo un error al leer el archivo. Asegúrate de que sea un archivo .json válido.");
-                    console.error(error);
-                }
-            };
-            reader.readAsText(file);
-            event.target.value = ''; 
-        }
-
-        function saveData() {
-            const data = {
-                moments,
-                parsedCharacters,
-                title: document.getElementById('storyTitle').value,
-                author: document.getElementById('storyAuthor').value
-            };
-            localStorage.setItem('termometroNarrativoData', JSON.stringify(data));
-        }
-
-        function loadData() {
-            const dataStr = localStorage.getItem('termometroNarrativoData');
-            if (dataStr) {
-                try {
-                    const data = JSON.parse(dataStr);
-                    moments = data.moments || [];
-                    parsedCharacters = data.parsedCharacters || [];
-                    document.getElementById('storyTitle').value = data.title || '';
-                    document.getElementById('storyAuthor').value = data.author || '';
-                    
-                    if (moments.length > 0) document.getElementById('btnTerminar').classList.remove('visually-hidden');
-                } catch(e) { console.error(e); }
-            }
-            renderGlobalCharacters();
-            renderMoments();
-            updateChart();
-        }
-
-        function clearData() {
-            if (confirm("¿Seguro que quieres borrar todos los datos de esta sesión en esta computadora?")) {
-                localStorage.removeItem('termometroNarrativoData');
-                moments = [];
-                parsedCharacters = [];
-                document.getElementById('storyTitle').value = '';
-                document.getElementById('storyAuthor').value = '';
-                document.getElementById('btnTerminar').classList.add('visually-hidden');
-                cerrarReflexion();
-                renderGlobalCharacters();
-                renderMoments();
-                updateChart();
-            }
         }
 
         function toggleMode() {
@@ -349,7 +445,7 @@
             if (val && !parsedCharacters.includes(val)) {
                 parsedCharacters.push(val);
                 input.value = '';
-                saveData();
+                saveDataLocal();
                 renderGlobalCharacters();
                 renderMoments(); 
             }
@@ -358,7 +454,7 @@
         function removeGlobalCharacter(char) {
             parsedCharacters = parsedCharacters.filter(c => c !== char);
             moments.forEach(m => { if(m.character === char) m.character = ''; });
-            saveData();
+            saveDataLocal();
             renderGlobalCharacters();
             renderMoments();
         }
@@ -387,7 +483,7 @@
 
             moments.push(newMoment);
             editingMomentId = newMoment.id;
-            saveData();
+            saveDataLocal();
             renderMoments();
             updateChart();
         }
@@ -401,7 +497,7 @@
                 }
                 m.isConfirmed = true;
                 editingMomentId = null; 
-                saveData();
+                saveDataLocal();
                 renderMoments();
                 updateChart();
             }
@@ -420,25 +516,25 @@
                 document.getElementById('btnTerminar').classList.add('visually-hidden');
                 document.getElementById('finalReflectionArea').classList.add('visually-hidden');
             }
-            saveData();
+            saveDataLocal();
             renderMoments();
             updateChart();
         }
         
         function updateField(id, field, value) {
             const m = moments.find(x => x.id === id);
-            if(m) { m[field] = value; saveData(); }
+            if(m) { m[field] = value; saveDataLocal(); }
         }
 
         function selectEmotion(momentId, emotionId) {
             const m = moments.find(x => x.id === momentId);
-            if(m && !m.isConfirmed) { m.emotion = emotionId; saveData(); renderMoments(); }
+            if(m && !m.isConfirmed) { m.emotion = emotionId; saveDataLocal(); renderMoments(); }
         }
 
         function onTemperatureChange(id, val) {
             const num = parseInt(val);
             const m = moments.find(x => x.id === id);
-            if(m) { m.temperature = num; saveData(); }
+            if(m) { m.temperature = num; saveDataLocal(); }
             const labelEl = document.getElementById(`temp-label-${id}`);
             if(labelEl) {
                 labelEl.innerText = `${num}° - ${getTempLabel(num)}`;
@@ -520,13 +616,10 @@
                                         <label class="block text-[11px] font-bold text-base-muted uppercase mb-1">🎶 Técnica / Recurso</label>
                                         <select onchange="updateField(${m.id}, 'technique', this.value)" class="w-full text-sm bg-white border border-base-border rounded-lg p-1.5 outline-none">
                                             <option value="">Elegir...</option>
-                                            <option value="Escala Pentatónica" ${m.technique === 'Escala Pentatónica' ? 'selected' : ''}>Escala Pentatónica</option>
-                                            <option value="Escala Menor / Tristeza" ${m.technique === 'Escala Menor / Tristeza' ? 'selected' : ''}>Escala Menor / Tristeza</option>
-                                            <option value="Cluster / Disonancia" ${m.technique === 'Cluster / Disonancia' ? 'selected' : ''}>Cluster / Disonancia</option>
-                                            <option value="Melodía Cantabile" ${m.technique === 'Melodía Cantabile' ? 'selected' : ''}>Melodía Cantabile</option>
-                                            <option value="Ostinato" ${m.technique === 'Ostinato' ? 'selected' : ''}>Ostinato</option>
-                                            <option value="Staccato / Picado" ${m.technique === 'Staccato / Picado' ? 'selected' : ''}>Staccato / Picado</option>
-                                            <option value="Silencio / Pausa dramática" ${m.technique === 'Silencio / Pausa dramática' ? 'selected' : ''}>Silencio / Pausa dramática</option>
+                                            <option value="Escala Mayor" ${m.technique === 'Escala Mayor' ? 'selected' : ''}>Escala Mayor</option>
+                                            <option value="Escala Menor" ${m.technique === 'Escala Menor' ? 'selected' : ''}>Escala Menor</option>
+                                            <option value="Cromatismo" ${m.technique === 'Cromatismo' ? 'selected' : ''}>Cromatismo</option>
+                                            <option value="Cluster" ${m.technique === 'Cluster' ? 'selected' : ''}>Cluster</option>
                                         </select>
                                     </div>
                                 </div>
@@ -689,7 +782,10 @@
             chartInstance.update();
         }
 
-        window.onload = () => { initChart(); loadData(); };
+        window.onload = () => {
+            initChart();
+            loadAvailableSessions();
+        };
     </script>
 </body>
 </html>
