@@ -773,7 +773,48 @@
                 data: getChartData(),
                 options: {
                     responsive: true, maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
+                    plugins: { 
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: 'rgba(38, 50, 56, 0.95)',
+                            titleFont: { size: 14, weight: 'bold' },
+                            bodyFont: { size: 12 },
+                            padding: 12,
+                            cornerRadius: 12,
+                            displayColors: false,
+                            callbacks: {
+                                title: function(context) {
+                                    const idx = context[0].dataIndex;
+                                    const m = moments[idx];
+                                    if (!m) return `Momento ${idx + 1}`;
+                                    return `Momento ${idx + 1}: ${m.title || 'Sin Título'} (${m.temperature}°)`;
+                                },
+                                label: function(context) {
+                                    const idx = context.dataIndex;
+                                    const m = moments[idx];
+                                    if (!m) return [];
+
+                                    const details = [];
+                                    if (m.description) details.push(`📝 Descripción: ${m.description}`);
+                                    if (m.character) details.push(`${isMusicMode ? '🎭 Motivo:' : '👤 Personaje:'} ${m.character}`);
+                                    
+                                    const emo = EMOTIONS.find(e => e.id === m.emotion);
+                                    if (emo) details.push(`😊 Emoción: ${emo.icon} ${emo.label}`);
+
+                                    if (isMusicMode) {
+                                        if (m.dynamic) details.push(`🔊 Dinámica: ${m.dynamic}`);
+                                        if (m.pitch) details.push(`📏 Registro: ${m.pitch}`);
+                                        if (m.technique) details.push(`🎶 Técnica: ${m.technique}`);
+                                        if (m.musicReflection) details.push(`💡 Instrumentación/Nota: ${m.musicReflection}`);
+                                    } else {
+                                        if (m.reflection) details.push(`💡 Reflexión: ${m.reflection}`);
+                                    }
+
+                                    return details;
+                                }
+                            }
+                        }
+                    },
                     scales: { 
                         y: { 
                             min: 0, max: 100,
