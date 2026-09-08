@@ -614,8 +614,8 @@
                 title: '', description: '', character: '', emotion: '',
                 temperature: moments.length > 0 ? moments[moments.length - 1].temperature : 20,
                 reflection: '', musicReflection: '',
-                dynamic: '', pitch: '', technique: '', 
-                instruments: [], pianoTimbre: '',
+                dynamic: '', pitch: '', technique: '', agogica: '',
+                instrument: '', pianoTimbre: '',
                 isConfirmed: false 
             };
 
@@ -661,23 +661,12 @@
         
         function updateField(id, field, value) {
             const m = moments.find(x => x.id === id);
-            if(m) { m[field] = value; saveDataLocal(); }
-        }
-
-        function toggleInstrument(id, instrumentName) {
-            const m = moments.find(x => x.id === id);
-            if (m) {
-                if (!Array.isArray(m.instruments)) {
-                    m.instruments = [];
+            if(m) { 
+                m[field] = value; 
+                saveDataLocal(); 
+                if (field === 'instrument') {
+                    renderMoments();
                 }
-                const index = m.instruments.indexOf(instrumentName);
-                if (index > -1) {
-                    m.instruments.splice(index, 1);
-                } else {
-                    m.instruments.push(instrumentName);
-                }
-                saveDataLocal();
-                renderMoments();
             }
         }
 
@@ -741,20 +730,10 @@
 
                     let musicFieldsHtml = '';
                     if (isMusicMode) {
-                        const instrumentList = ['Guitarra', 'Piano', 'Metalófono', 'Triángulo', 'Melódica', 'Percusión'];
-                        const currentInsts = Array.isArray(m.instruments) ? m.instruments : [];
+                        const selectedInstrument = m.instrument || (Array.isArray(m.instruments) && m.instruments.length > 0 ? m.instruments[0] : '');
                         
-                        const instrumentCheckboxesHtml = instrumentList.map(inst => {
-                            const isChecked = currentInsts.includes(inst);
-                            return `
-                                <button type="button" onclick="toggleInstrument(${m.id}, '${inst}')" class="px-2.5 py-1 rounded-lg text-xs font-semibold border transition-colors flex items-center gap-1 ${isChecked ? 'bg-temp-hot text-white border-temp-hot shadow-sm' : 'bg-white text-base-text border-base-border hover:bg-base-bg'}">
-                                    <span>${isChecked ? '✓' : '＋'}</span> ${inst}
-                                </button>
-                            `;
-                        }).join('');
-
                         let pianoTimbreSelectHtml = '';
-                        if (currentInsts.includes('Piano')) {
+                        if (selectedInstrument === 'Piano' || (Array.isArray(m.instruments) && m.instruments.includes('Piano'))) {
                             const timbreOptions = PIANO_TIMBRES.map((timbre, tIdx) => 
                                 `<option value="${tIdx + 1}. ${timbre}" ${m.pianoTimbre === `${tIdx + 1}. ${timbre}` ? 'selected' : ''}>${tIdx + 1}. ${timbre}</option>`
                             ).join('');
@@ -774,15 +753,34 @@
                             <div class="bg-temp-hot/5 border border-temp-hot/20 p-3 rounded-xl mb-4 space-y-3">
                                 <label class="block text-xs font-bold text-temp-hot uppercase">🎼 Parámetros de Interpretación</label>
                                 
-                                <div>
-                                    <label class="block text-[11px] font-bold text-base-muted uppercase mb-1.5">🎸 Instrumentos (Puedes elegir varios)</label>
-                                    <div class="flex flex-wrap gap-1.5">
-                                        ${instrumentCheckboxesHtml}
-                                    </div>
-                                    ${pianoTimbreSelectHtml}
-                                </div>
-
                                 <div class="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label class="block text-[11px] font-bold text-base-muted uppercase mb-1">🎸 Instrumento</label>
+                                        <select onchange="updateField(${m.id}, 'instrument', this.value)" class="w-full text-sm bg-white border border-base-border rounded-lg p-1.5 outline-none">
+                                            <option value="">Elegir...</option>
+                                            <option value="Guitarra" ${selectedInstrument === 'Guitarra' ? 'selected' : ''}>Guitarra</option>
+                                            <option value="Piano" ${selectedInstrument === 'Piano' ? 'selected' : ''}>Piano</option>
+                                            <option value="Metalófono" ${selectedInstrument === 'Metalófono' ? 'selected' : ''}>Metalófono</option>
+                                            <option value="Triángulo" ${selectedInstrument === 'Triángulo' ? 'selected' : ''}>Triángulo</option>
+                                            <option value="Melódica" ${selectedInstrument === 'Melódica' ? 'selected' : ''}>Melódica</option>
+                                            <option value="Percusión" ${selectedInstrument === 'Percusión' ? 'selected' : ''}>Percusión</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="block text-[11px] font-bold text-base-muted uppercase mb-1">⏱️ Agógica / Tempo</label>
+                                        <select onchange="updateField(${m.id}, 'agogica', this.value)" class="w-full text-sm bg-white border border-base-border rounded-lg p-1.5 outline-none">
+                                            <option value="">Elegir...</option>
+                                            <option value="Largo (Muy lento)" ${m.agogica === 'Largo (Muy lento)' ? 'selected' : ''}>Largo (Muy lento)</option>
+                                            <option value="Adagio (Lento)" ${m.agogica === 'Adagio (Lento)' ? 'selected' : ''}>Adagio (Lento)</option>
+                                            <option value="Andante (Tranquilo)" ${m.agogica === 'Andante (Tranquilo)' ? 'selected' : ''}>Andante (Tranquilo)</option>
+                                            <option value="Moderato (Moderado)" ${m.agogica === 'Moderato (Moderado)' ? 'selected' : ''}>Moderato (Moderado)</option>
+                                            <option value="Allegro (Rápido)" ${m.agogica === 'Allegro (Rápido)' ? 'selected' : ''}>Allegro (Rápido)</option>
+                                            <option value="Presto (Muy rápido)" ${m.agogica === 'Presto (Muy rápido)' ? 'selected' : ''}>Presto (Muy rápido)</option>
+                                            <option value="Accelerando (Acelerando)" ${m.agogica === 'Accelerando (Acelerando)' ? 'selected' : ''}>Accelerando (Acelerando)</option>
+                                            <option value="Ritardando (Frenando)" ${m.agogica === 'Ritardando (Frenando)' ? 'selected' : ''}>Ritardando (Frenando)</option>
+                                            <option value="A tempo (Tempo original)" ${m.agogica === 'A tempo (Tempo original)' ? 'selected' : ''}>A tempo (Tempo original)</option>
+                                        </select>
+                                    </div>
                                     <div>
                                         <label class="block text-[11px] font-bold text-base-muted uppercase mb-1">🔊 Dinámica</label>
                                         <select onchange="updateField(${m.id}, 'dynamic', this.value)" class="w-full text-sm bg-white border border-base-border rounded-lg p-1.5 outline-none">
@@ -816,6 +814,7 @@
                                         </select>
                                     </div>
                                 </div>
+                                ${pianoTimbreSelectHtml}
                             </div>
                         `;
                     }
@@ -871,13 +870,15 @@
                     
                     if (isMusicMode) {
                         let badges = [];
-                        if (Array.isArray(m.instruments) && m.instruments.length > 0) {
-                            let instText = `🎸 Inst: ${m.instruments.join(', ')}`;
-                            if (m.instruments.includes('Piano') && m.pianoTimbre) {
+                        const instVal = m.instrument || (Array.isArray(m.instruments) && m.instruments.length > 0 ? m.instruments.join(', ') : '');
+                        if (instVal) {
+                            let instText = `🎸 Inst: ${instVal}`;
+                            if ((m.instrument === 'Piano' || (Array.isArray(m.instruments) && m.instruments.includes('Piano'))) && m.pianoTimbre) {
                                 instText += ` (${m.pianoTimbre})`;
                             }
                             badges.push(instText);
                         }
+                        if (m.agogica) badges.push(`⏱️ Agógica: ${m.agogica}`);
                         if (m.dynamic || m.pitch) badges.push(`🔊 Dinámica: ${m.dynamic || '-'} | Altura: ${m.pitch || '-'}`);
                         if (m.technique) badges.push(`💥 Técnica: ${m.technique}`);
 
@@ -978,11 +979,15 @@
                                     if (emo) details.push(`😊 Emoción: ${emo.icon} ${emo.label}`);
 
                                     if (isMusicMode) {
-                                        if (Array.isArray(m.instruments) && m.instruments.length > 0) {
-                                            let instStr = `🎸 Instrumentos: ${m.instruments.join(', ')}`;
-                                            if (m.instruments.includes('Piano') && m.pianoTimbre) instStr += ` (${m.pianoTimbre})`;
+                                        const instVal = m.instrument || (Array.isArray(m.instruments) && m.instruments.length > 0 ? m.instruments.join(', ') : '');
+                                        if (instVal) {
+                                            let instStr = `🎸 Instrumento: ${instVal}`;
+                                            if ((m.instrument === 'Piano' || (Array.isArray(m.instruments) && m.instruments.includes('Piano'))) && m.pianoTimbre) {
+                                                instStr += ` (${m.pianoTimbre})`;
+                                            }
                                             details.push(instStr);
                                         }
+                                        if (m.agogica) details.push(`⏱️ Agógica: ${m.agogica}`);
                                         if (m.dynamic) details.push(`🔊 Dinámica: ${m.dynamic}`);
                                         if (m.pitch) details.push(`📏 Registro: ${m.pitch}`);
                                         if (m.technique) details.push(`🎶 Técnica: ${m.technique}`);
