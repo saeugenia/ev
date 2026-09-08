@@ -76,6 +76,13 @@
             to { opacity: 1; transform: translateY(0); }
         }
         .visually-hidden { display: none !important; }
+
+        /* Highlight animation for active moment during playback */
+        .moment-active {
+            border-color: #F4511E !important;
+            box-shadow: 0 0 15px rgba(244, 81, 30, 0.25) !important;
+            transform: scale(1.01);
+        }
     </style>
 </head>
 
@@ -213,7 +220,43 @@
                         Eje Vertical: Estructura Narrativa (0 - 100°)
                     </span>
                 </div>
-                <div class="flex-1 relative min-h-[300px] w-full mt-2">
+
+                <!-- Barra del Cursor Temporal / Score Follower Controls -->
+                <div class="bg-base-bg border border-base-border rounded-2xl p-3 mb-2 flex flex-wrap items-center justify-between gap-3 shadow-inner">
+                    <div class="flex items-center gap-2">
+                        <button id="btnPlay" onclick="togglePlay()" class="bg-temp-hot hover:bg-temp-max text-white font-bold px-3 py-1.5 rounded-xl text-xs flex items-center gap-1 transition-all shadow-sm">
+                            <span id="playIcon">▶️</span> <span id="playText">Reproducir</span>
+                        </button>
+                        <button onclick="stopPlayback()" class="bg-white hover:bg-base-border text-base-text font-bold px-3 py-1.5 rounded-xl text-xs border border-base-border transition-colors flex items-center gap-1 shadow-sm">
+                            ⏹️ Detener
+                        </button>
+                        <button id="btnLoop" onclick="toggleLoop()" class="bg-white hover:bg-base-border text-base-text font-bold px-2.5 py-1.5 rounded-xl text-xs border border-base-border transition-colors flex items-center gap-1 shadow-sm" title="Modo Bucle">
+                            🔁 <span id="loopStatus" class="text-[10px] text-base-muted">Off</span>
+                        </button>
+                    </div>
+
+                    <div class="flex items-center gap-3">
+                        <div class="flex items-center gap-1 bg-white px-2 py-1 rounded-xl border border-base-border text-xs font-semibold">
+                            <span class="text-base-muted text-[10px] uppercase font-bold">Vel:</span>
+                            <select id="playbackSpeed" onchange="changeSpeed(this.value)" class="bg-transparent outline-none cursor-pointer text-xs font-bold text-temp-max">
+                                <option value="0.5">0.5x</option>
+                                <option value="1.0" selected>1.0x</option>
+                                <option value="1.5">1.5x</option>
+                                <option value="2.0">2.0x</option>
+                            </select>
+                        </div>
+
+                        <button id="btnAudio" onclick="toggleAudio()" class="bg-white hover:bg-base-border text-base-text font-bold px-2.5 py-1.5 rounded-xl text-xs border border-base-border transition-colors flex items-center gap-1 shadow-sm" title="Sonido Sintetizado de Guía">
+                            🔊 <span id="audioStatus" class="text-[10px] text-temp-max">Audio On</span>
+                        </button>
+
+                        <div class="text-xs font-bold text-base-text bg-white px-3 py-1 rounded-xl border border-base-border font-mono shadow-sm flex items-center gap-1">
+                            ⏱️ <span id="timeDisplay">00:00 / 00:00</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex-1 relative min-h-[300px] w-full mt-2 cursor-crosshair">
                     <canvas id="thermometerChart"></canvas>
                 </div>
             </div>
@@ -305,6 +348,18 @@
         let unsubscribeFirestore = null;
         let historyLog = [];
 
+        // Score Follower / Cursor Temporal State Variables
+        let isPlaying = false;
+        let playheadPosition = 0; // 0.0 to 1.0 (normalized temporal progress)
+        let playbackSpeed = 1.0;
+        let isLooping = false;
+        let playAnimationId = null;
+        let lastTimestamp = null;
+        let baseDurationPerMoment = 3.0; // 3 seconds per moment interval
+        let audioEnabled = true;
+        let lastTriggeredMomentIndex = -1;
+        let audioCtx = null;
+
         const getTempColor = (val) => {
             if(val <= 20) return '#4DB6AC'; 
             if(val <= 40) return '#FDD835'; 
@@ -327,6 +382,46 @@
             if(val <= 80) return 'Clímax';
             return 'desenlace';
         };
+
+        function initAudio() {
+            if (!audioCtx) {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                if (AudioContext) {
+                    audioCtx = new AudioContext();
+                }
+            }
+            if (audioCtx && audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        function playNodeTone(temperature) {
+            if (!audioEnabled) return;
+            initAudio();
+            if (!audioCtx) return;
+
+            try {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+
+                // Map temperature (0 - 100) to musical frequency (C4 to C6)
+                const freq = 261.63 * Math.pow(2, (temperature / 100) * 2);
+                
+                osc.type = isMusicMode ? 'sine' : 'triangle';
+                osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+
+                gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.4);
+
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.4);
+            } catch (e) {
+                console.warn("Audio Context playback warning:", e);
+            }
+        }
 
         function onClassChange() {
             const selectedClass = document.getElementById('sessionClass').value;
@@ -543,7 +638,7 @@
             renderMoments();
             updateChart();
         }
-        
+
         function updateField(id, field, value) {
             const m = moments.find(x => x.id === id);
             if(m) { 
@@ -595,6 +690,7 @@
                 const isEditing = m.id === editingMomentId;
                 const card = document.createElement('div');
                 card.id = `moment-card-${m.id}`;
+                card.dataset.index = index;
                 card.className = `border rounded-2xl transition-all duration-300 relative ${isEditing ? 'bg-white border-temp-medium/50 p-5 ring-1 ring-temp-medium/20 shadow-md' : 'bg-base-surface border-base-border p-4'} fade-in mb-4`;
                 const numStr = (index + 1).toString().padStart(2, '0');
 
@@ -808,6 +904,51 @@
             });
         }
 
+        // Score Follower Plugin for Chart.js
+        const scoreFollowerPlugin = {
+            id: 'scoreFollower',
+            afterDraw: (chart) => {
+                if (!chart.chartArea) return;
+                const ctx = chart.ctx;
+                const { top, bottom, left, right, width, height } = chart.chartArea;
+
+                // Calculate current X position of playhead
+                const playheadX = left + (playheadPosition * width);
+
+                ctx.save();
+
+                // Draw Vertical Score Follower Cursor Line
+                ctx.beginPath();
+                ctx.moveTo(playheadX, top);
+                ctx.lineTo(playheadX, bottom);
+                ctx.lineWidth = 3;
+                ctx.strokeStyle = '#F4511E';
+                ctx.setLineDash([]);
+                ctx.shadowColor = 'rgba(244, 81, 30, 0.4)';
+                ctx.shadowBlur = 8;
+                ctx.stroke();
+
+                // Draw Playhead Top Handle (Knob)
+                ctx.beginPath();
+                ctx.moveTo(playheadX - 7, top - 8);
+                ctx.lineTo(playheadX + 7, top - 8);
+                ctx.lineTo(playheadX, top + 2);
+                ctx.closePath();
+                ctx.fillStyle = '#F4511E';
+                ctx.fill();
+
+                // Draw Playhead Bottom Pin
+                ctx.beginPath();
+                ctx.arc(playheadX, bottom, 5, 0, Math.PI * 2);
+                ctx.fillStyle = '#F4511E';
+                ctx.fill();
+
+                ctx.restore();
+            }
+        };
+
+        Chart.register(scoreFollowerPlugin);
+
         function initChart() {
             const ctx = document.getElementById('thermometerChart').getContext('2d');
             Chart.defaults.font.family = 'Plus Jakarta Sans';
@@ -900,6 +1041,232 @@
                     elements: { line: { borderWidth: 3 } }
                 }
             });
+
+            // Interactive Scrubbing / Seek on Canvas Click or Drag
+            setupCanvasScrubbing();
+        }
+
+        function setupCanvasScrubbing() {
+            const canvas = document.getElementById('thermometerChart');
+            let isDragging = false;
+
+            const handleScrub = (evt) => {
+                if (!chartInstance || !chartInstance.chartArea) return;
+                const rect = canvas.getBoundingClientRect();
+                const mouseX = evt.clientX - rect.left;
+                const { left, width } = chartInstance.chartArea;
+
+                let normX = (mouseX - left) / width;
+                if (normX < 0) normX = 0;
+                if (normX > 1) normX = 1;
+
+                playheadPosition = normX;
+                checkMomentHighlighting();
+                updateTimeDisplay();
+                chartInstance.draw();
+            };
+
+            canvas.addEventListener('mousedown', (e) => {
+                isDragging = true;
+                initAudio();
+                handleScrub(e);
+            });
+
+            canvas.addEventListener('mousemove', (e) => {
+                if (isDragging) handleScrub(e);
+            });
+
+            window.addEventListener('mouseup', () => {
+                isDragging = false;
+            });
+        }
+
+        function updateTimeDisplay() {
+            const totalMoments = Math.max(1, moments.length);
+            const totalSecs = totalMoments * baseDurationPerMoment;
+            const currentSecs = playheadPosition * totalSecs;
+
+            const formatSecs = (s) => {
+                const mins = Math.floor(s / 60);
+                const secs = Math.floor(s % 60);
+                return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+            };
+
+            const timeDisplay = document.getElementById('timeDisplay');
+            if (timeDisplay) {
+                timeDisplay.innerText = `${formatSecs(currentSecs)} / ${formatSecs(totalSecs)}`;
+            }
+        }
+
+        function checkMomentHighlighting() {
+            if (moments.length === 0) {
+                if (chartInstance && chartInstance.tooltip) {
+                    chartInstance.setActiveElements([]);
+                    chartInstance.tooltip.setActiveElements([], { x: 0, y: 0 });
+                }
+                return;
+            }
+
+            const totalIntervals = Math.max(1, moments.length - 1);
+            let currentMomentIdx = 0;
+
+            if (moments.length === 1) {
+                currentMomentIdx = 0;
+            } else {
+                currentMomentIdx = Math.round(playheadPosition * totalIntervals);
+            }
+
+            if (currentMomentIdx < 0) currentMomentIdx = 0;
+            if (currentMomentIdx >= moments.length) currentMomentIdx = moments.length - 1;
+
+            // Highlight Active Card in Sidebar
+            const allCards = document.querySelectorAll('#momentsList > div');
+            allCards.forEach((card, idx) => {
+                if (idx === currentMomentIdx) {
+                    if (!card.classList.contains('moment-active')) {
+                        card.classList.add('moment-active');
+                        card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    }
+                } else {
+                    card.classList.remove('moment-active');
+                }
+            });
+
+            // Trigger tone synthesis if crossing a new moment node
+            if (currentMomentIdx !== lastTriggeredMomentIndex) {
+                lastTriggeredMomentIndex = currentMomentIdx;
+                if (isPlaying && moments[currentMomentIdx]) {
+                    playNodeTone(moments[currentMomentIdx].temperature);
+                }
+            }
+
+            // Muestra automáticamente el cuadro informativo (Tooltip) en el gráfico para el punto activo
+            if (chartInstance && chartInstance.tooltip && chartInstance.getDatasetMeta(0)?.data[currentMomentIdx]) {
+                try {
+                    const metaPoint = chartInstance.getDatasetMeta(0).data[currentMomentIdx];
+                    chartInstance.setActiveElements([
+                        { datasetIndex: 0, index: currentMomentIdx }
+                    ]);
+                    chartInstance.tooltip.setActiveElements([
+                        { datasetIndex: 0, index: currentMomentIdx }
+                    ], {
+                        x: metaPoint.x,
+                        y: metaPoint.y
+                    });
+                } catch (e) {
+                    console.warn("Error sincronizando tooltip en gráfico:", e);
+                }
+            }
+        }
+
+        function animateScoreFollower(timestamp) {
+            if (!lastTimestamp) lastTimestamp = timestamp;
+            const delta = (timestamp - lastTimestamp) / 1000;
+            lastTimestamp = timestamp;
+
+            if (isPlaying) {
+                const totalSecs = Math.max(1, moments.length) * baseDurationPerMoment;
+                playheadPosition += (delta * playbackSpeed) / totalSecs;
+
+                if (playheadPosition >= 1.0) {
+                    if (isLooping) {
+                        playheadPosition = 0.0;
+                        lastTriggeredMomentIndex = -1;
+                    } else {
+                        playheadPosition = 1.0;
+                        isPlaying = false;
+                        updatePlayButtonUI();
+                    }
+                }
+
+                checkMomentHighlighting();
+                updateTimeDisplay();
+                if (chartInstance) chartInstance.draw();
+            }
+
+            if (isPlaying) {
+                playAnimationId = requestAnimationFrame(animateScoreFollower);
+            }
+        }
+
+        function togglePlay() {
+            initAudio();
+            if (moments.length === 0) {
+                alert("Agrega al menos un momento para reproducir el cursor temporal.");
+                return;
+            }
+
+            if (isPlaying) {
+                isPlaying = false;
+                if (playAnimationId) cancelAnimationFrame(playAnimationId);
+            } else {
+                if (playheadPosition >= 1.0) {
+                    playheadPosition = 0.0;
+                    lastTriggeredMomentIndex = -1;
+                }
+                isPlaying = true;
+                lastTimestamp = performance.now();
+                playAnimationId = requestAnimationFrame(animateScoreFollower);
+            }
+            updatePlayButtonUI();
+        }
+
+        function stopPlayback() {
+            isPlaying = false;
+            if (playAnimationId) cancelAnimationFrame(playAnimationId);
+            playheadPosition = 0.0;
+            lastTriggeredMomentIndex = -1;
+            updatePlayButtonUI();
+            checkMomentHighlighting();
+            updateTimeDisplay();
+            if (chartInstance) chartInstance.draw();
+        }
+
+        function updatePlayButtonUI() {
+            const btnPlay = document.getElementById('btnPlay');
+            const playIcon = document.getElementById('playIcon');
+            const playText = document.getElementById('playText');
+
+            if (isPlaying) {
+                playIcon.innerText = "⏸️";
+                playText.innerText = "Pausa";
+                btnPlay.className = "bg-temp-max text-white font-bold px-3 py-1.5 rounded-xl text-xs flex items-center gap-1 transition-all shadow-sm";
+            } else {
+                playIcon.innerText = "▶️";
+                playText.innerText = "Reproducir";
+                btnPlay.className = "bg-temp-hot hover:bg-temp-max text-white font-bold px-3 py-1.5 rounded-xl text-xs flex items-center gap-1 transition-all shadow-sm";
+            }
+        }
+
+        function toggleLoop() {
+            isLooping = !isLooping;
+            const loopStatus = document.getElementById('loopStatus');
+            const btnLoop = document.getElementById('btnLoop');
+            if (isLooping) {
+                loopStatus.innerText = "On";
+                loopStatus.className = "text-[10px] text-temp-max font-bold";
+                btnLoop.classList.add('border-temp-hot');
+            } else {
+                loopStatus.innerText = "Off";
+                loopStatus.className = "text-[10px] text-base-muted";
+                btnLoop.classList.remove('border-temp-hot');
+            }
+        }
+
+        function changeSpeed(val) {
+            playbackSpeed = parseFloat(val) || 1.0;
+        }
+
+        function toggleAudio() {
+            audioEnabled = !audioEnabled;
+            const audioStatus = document.getElementById('audioStatus');
+            if (audioEnabled) {
+                audioStatus.innerText = "Audio On";
+                audioStatus.className = "text-[10px] text-temp-max font-bold";
+            } else {
+                audioStatus.innerText = "Audio Off";
+                audioStatus.className = "text-[10px] text-base-muted";
+            }
         }
 
         function getChartData() {
@@ -923,6 +1290,8 @@
             if(!chartInstance) return;
             chartInstance.data = getChartData();
             chartInstance.update();
+            checkMomentHighlighting();
+            updateTimeDisplay();
         }
 
         function saveDataLocal() { console.log("Datos guardados localmente"); }
@@ -940,6 +1309,8 @@
         window.onload = () => {
             initChart();
             loadAvailableSessions();
+            checkMomentHighlighting();
+            updateTimeDisplay();
         };
     </script>
 </body>
