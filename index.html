@@ -214,7 +214,7 @@
                         📈 Curva de intensidad
                     </h2>
                     <span id="chartParameterHint" class="text-xs font-semibold bg-base-bg border border-base-border text-base-muted px-2.5 py-1 rounded-lg">
-                        Eje Vertical: Tensión Narrativa (0 - 100°)
+                        Eje Vertical: Estructura Narrativa (0 - 100°)
                     </span>
                 </div>
                 <div class="flex-1 relative min-h-[300px] w-full mt-2">
@@ -323,24 +323,27 @@
         let historyLog = [];
 
         const getTempColor = (val) => {
-            if(val <= 30) return '#4DB6AC'; 
-            if(val <= 60) return '#FDD835'; 
-            if(val <= 85) return '#FB8C00'; 
-            return '#F4511E'; 
+            if(val <= 20) return '#4DB6AC'; 
+            if(val <= 40) return '#FDD835'; 
+            if(val <= 60) return '#FB8C00'; 
+            if(val <= 80) return '#F4511E';
+            return '#D32F2F'; 
         };
 
+        // Terminología curricular solicitada: Situación Inicial, Conflicto, Desarrollo, Clímax, desenlace
         const getTempLabel = (val) => {
             if (isMusicMode) {
                 if(val <= 20) return 'pp (Pianissimo - Muy suave)';
                 if(val <= 40) return 'p (Piano - Suave)';
                 if(val <= 60) return 'mp / mf (Mezzo - Moderado)';
-                if(val <= 85) return 'f (Forte - Fuerte)';
+                if(val <= 80) return 'f (Forte - Fuerte)';
                 return 'ff (Fortissimo - Muy fuerte)';
             }
-            if(val <= 30) return 'Fría / Calma';
-            if(val <= 60) return 'Tibia / Interesante';
-            if(val <= 85) return 'Caliente / Tensa';
-            return '¡Fuego! / Clímax';
+            if(val <= 20) return 'Situación Inicial';
+            if(val <= 40) return 'Conflicto';
+            if(val <= 60) return 'Desarrollo';
+            if(val <= 80) return 'Clímax';
+            return 'desenlace';
         };
 
         // Escucha cambios de la asignatura para sincronizar automáticamente el modo
@@ -467,7 +470,7 @@
                 charLabel.innerText = "👥 Lista de Personajes";
                 timelineTitle.innerText = "Momentos de la historia";
                 chartTitle.innerHTML = "📈 Curva de intensidad";
-                chartHint.innerHTML = "🌡️ Eje Vertical: Tensión / Dramatismo (0 - 100°)";
+                chartHint.innerHTML = "🌡️ Eje Vertical: Estructura Narrativa (0 - 100°)";
                 if (classSelect && classSelect.value === 'Música') {
                     classSelect.value = 'Lenguaje';
                 }
@@ -716,7 +719,7 @@
                         </button>
                     `).join('');
                     
-                    const sliderLabelText = isMusicMode ? "Dinámica / Volumen (Tocar más fuerte/suave)" : "Tensión Narrativa (0 - 100°)";
+                    const sliderLabelText = isMusicMode ? "Dinámica / Volumen (Tocar más fuerte/suave)" : "Etapa Narrativa (0 - 100°)";
                     
                     card.innerHTML = `
                         <div class="flex items-center justify-between mb-4">
@@ -847,7 +850,7 @@
                                     const idx = context[0].dataIndex;
                                     const m = moments[idx];
                                     if (!m) return `Momento ${idx + 1}`;
-                                    const modeUnit = isMusicMode ? `Dinámica: ${getTempLabel(m.temperature)}` : `${m.temperature}°`;
+                                    const modeUnit = isMusicMode ? `Dinámica: ${getTempLabel(m.temperature)}` : `${getTempLabel(m.temperature)} (${m.temperature}°)`;
                                     return `Momento ${idx + 1}: ${m.title || 'Sin Título'} (${modeUnit})`;
                                 },
                                 label: function(context) {
@@ -901,12 +904,12 @@
                                         if (value === 100) return 'fff (Máximo)';
                                         return '';
                                     } else {
-                                        if (value === 0) return '0 (Calma)';
-                                        if (value === 20) return '20';
-                                        if (value === 40) return '40 (Tibia)';
+                                        if (value === 0) return '0 (Situación Inicial)';
+                                        if (value === 20) return '20 (Conflicto)';
+                                        if (value === 40) return '40 (Desarrollo)';
                                         if (value === 60) return '60';
-                                        if (value === 80) return '80 (Tensa)';
-                                        if (value === 100) return '100 (Clímax)';
+                                        if (value === 80) return '80 (Clímax)';
+                                        if (value === 100) return '100 (desenlace)';
                                         return value;
                                     }
                                 }
