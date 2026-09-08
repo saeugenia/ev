@@ -286,6 +286,27 @@
             { id: 'asco', icon: '🤢', label: 'Asco' }
         ];
 
+        // 128 Timbres estándar de Teclado Eléctrico / Sintetizador (General MIDI)
+        const PIANO_TIMBRES = [
+            "Piano de Cola Acústico", "Piano Brillante", "Piano Eléctrico de Cola", "Piano Honky-tonk",
+            "Piano Eléctrico 1 (Rhodes)", "Piano Eléctrico 2 (Chorused)", "Clavecin (Harpsichord)", "Clavinet",
+            "Celesta", "Glockenspiel", "Caja de Música", "Vibráfono", "Marimba", "Xilófono", "Campanas Tubulares", "Dulcimer",
+            "Órgano Hammond (Drawbar)", "Órgano Percusivo", "Órgano Rock", "Órgano de Iglesia", "Órgano Reed", "Acordeón", "Armónica", "Bandoneón / Acordeón Tango",
+            "Guitarra Acústica (Nylon)", "Guitarra Acústica (Acero)", "Guitarra Eléctrica (Jazz)", "Guitarra Eléctrica (Limpia)", "Guitarra Eléctrica (Sordina)", "Guitarra Overdrive", "Guitarra Distorsión", "Armónicos de Guitarra",
+            "Bajo Acústico", "Bajo Eléctrico (Dedos)", "Bajo Eléctrico (Púa)", "Bajo Fretless", "Bajo Slap 1", "Bajo Slap 2", "Sintetizador de Bajo 1", "Sintetizador de Bajo 2",
+            "Violín", "Viola", "Violonchelo", "Contrabajo", "Cuerdas Tremolo", "Cuerdas Pizzicato", "Arpa Orquestal", "Timbales",
+            "Ensamble de Cuerdas 1", "Ensamble de Cuerdas 2", "Cuerdas Sintetizadas 1", "Cuerdas Sintetizadas 2", "Coro (Aahs)", "Voz (Oohs)", "Voz Sintetizada", "Golpe Orquestal (Orchestra Hit)",
+            "Trompeta", "Trombón", "Tuba", "Trompeta con Sordina", "Corno Francés", "Sección de Bronces", "Bronces Sintetizados 1", "Bronces Sintetizados 2",
+            "Saxofón Soprano", "Saxofón Alto", "Saxofón Tenor", "Saxofón Barítono", "Oboe", "Corno Inglés", "Fagot", "Clarinete",
+            "Píccolo", "Flauta Traversa", "Flauta Dulce", "Flauta de Pan", "Botella Soplada", "Shakuhachi", "Silbato", "Ocarina",
+            "Sinte Lead 1 (Cuadrada)", "Sinte Lead 2 (Diente de sierra)", "Sinte Lead 3 (Calíope)", "Sinte Lead 4 (Chiff)", "Sinte Lead 5 (Charang)", "Sinte Lead 6 (Voz)", "Sinte Lead 7 (Quintas)", "Sinte Lead 8 (Bajo+Lead)",
+            "Sinte Pad 1 (New Age)", "Sinte Pad 2 (Cálido)", "Sinte Pad 3 (Polisoplado)", "Sinte Pad 4 (Coro)", "Sinte Pad 5 (Frotado)", "Sinte Pad 6 (Metálico)", "Sinte Pad 7 (Halo)", "Sinte Pad 8 (Barrido)",
+            "Efecto 1 (Lluvia)", "Efecto 2 (Banda Sonora)", "Efecto 3 (Cristal)", "Efecto 4 (Atmósfera)", "Efecto 5 (Brillo)", "Efecto 6 (Duendes)", "Efecto 7 (Ecos)", "Efecto 8 (Ciencia Ficción)",
+            "Sitar", "Banjo", "Shamisen", "Koto", "Kalimba", "Gaita", "Fiddle (Violín Folclórico)", "Shanai", "Campanilla (Tinkle Bell)", "Agogô", "Tambores de Acero", "Caja de Madera (Woodblock)",
+            "Tambor Taiko", "Tom Melódico", "Tambor Sintético", "Platillo Invertido", "Ruido de Traste de Guitarra", "Ruido de Respiración", "Olas de Mar", "Canto de Pájaro",
+            "Timbre de Teléfono", "Helicóptero", "Aplausos", "Disparo"
+        ];
+
         let moments = [];
         let chartInstance = null;
         let parsedCharacters = [];
@@ -594,6 +615,7 @@
                 temperature: moments.length > 0 ? moments[moments.length - 1].temperature : 20,
                 reflection: '', musicReflection: '',
                 dynamic: '', pitch: '', technique: '', 
+                instruments: [], pianoTimbre: '',
                 isConfirmed: false 
             };
 
@@ -640,6 +662,23 @@
         function updateField(id, field, value) {
             const m = moments.find(x => x.id === id);
             if(m) { m[field] = value; saveDataLocal(); }
+        }
+
+        function toggleInstrument(id, instrumentName) {
+            const m = moments.find(x => x.id === id);
+            if (m) {
+                if (!Array.isArray(m.instruments)) {
+                    m.instruments = [];
+                }
+                const index = m.instruments.indexOf(instrumentName);
+                if (index > -1) {
+                    m.instruments.splice(index, 1);
+                } else {
+                    m.instruments.push(instrumentName);
+                }
+                saveDataLocal();
+                renderMoments();
+            }
         }
 
         function selectEmotion(momentId, emotionId) {
@@ -702,9 +741,47 @@
 
                     let musicFieldsHtml = '';
                     if (isMusicMode) {
+                        const instrumentList = ['Guitarra', 'Piano', 'Metalófono', 'Triángulo', 'Melódica', 'Percusión'];
+                        const currentInsts = Array.isArray(m.instruments) ? m.instruments : [];
+                        
+                        const instrumentCheckboxesHtml = instrumentList.map(inst => {
+                            const isChecked = currentInsts.includes(inst);
+                            return `
+                                <button type="button" onclick="toggleInstrument(${m.id}, '${inst}')" class="px-2.5 py-1 rounded-lg text-xs font-semibold border transition-colors flex items-center gap-1 ${isChecked ? 'bg-temp-hot text-white border-temp-hot shadow-sm' : 'bg-white text-base-text border-base-border hover:bg-base-bg'}">
+                                    <span>${isChecked ? '✓' : '＋'}</span> ${inst}
+                                </button>
+                            `;
+                        }).join('');
+
+                        let pianoTimbreSelectHtml = '';
+                        if (currentInsts.includes('Piano')) {
+                            const timbreOptions = PIANO_TIMBRES.map((timbre, tIdx) => 
+                                `<option value="${tIdx + 1}. ${timbre}" ${m.pianoTimbre === `${tIdx + 1}. ${timbre}` ? 'selected' : ''}>${tIdx + 1}. ${timbre}</option>`
+                            ).join('');
+
+                            pianoTimbreSelectHtml = `
+                                <div class="mt-3 bg-white p-2.5 rounded-xl border border-base-border fade-in">
+                                    <label class="block text-[11px] font-bold text-temp-hot uppercase mb-1">🎹 Timbre de Teclado Eléctrico (128 Tonos)</label>
+                                    <select onchange="updateField(${m.id}, 'pianoTimbre', this.value)" class="w-full text-xs font-medium bg-base-bg border border-base-border rounded-lg p-1.5 outline-none focus:border-temp-hot">
+                                        <option value="">Seleccionar timbre...</option>
+                                        ${timbreOptions}
+                                    </select>
+                                </div>
+                            `;
+                        }
+
                         musicFieldsHtml = `
                             <div class="bg-temp-hot/5 border border-temp-hot/20 p-3 rounded-xl mb-4 space-y-3">
                                 <label class="block text-xs font-bold text-temp-hot uppercase">🎼 Parámetros de Interpretación</label>
+                                
+                                <div>
+                                    <label class="block text-[11px] font-bold text-base-muted uppercase mb-1.5">🎸 Instrumentos (Puedes elegir varios)</label>
+                                    <div class="flex flex-wrap gap-1.5">
+                                        ${instrumentCheckboxesHtml}
+                                    </div>
+                                    ${pianoTimbreSelectHtml}
+                                </div>
+
                                 <div class="grid grid-cols-2 gap-3">
                                     <div>
                                         <label class="block text-[11px] font-bold text-base-muted uppercase mb-1">🔊 Dinámica</label>
@@ -794,6 +871,13 @@
                     
                     if (isMusicMode) {
                         let badges = [];
+                        if (Array.isArray(m.instruments) && m.instruments.length > 0) {
+                            let instText = `🎸 Inst: ${m.instruments.join(', ')}`;
+                            if (m.instruments.includes('Piano') && m.pianoTimbre) {
+                                instText += ` (${m.pianoTimbre})`;
+                            }
+                            badges.push(instText);
+                        }
                         if (m.dynamic || m.pitch) badges.push(`🔊 Dinámica: ${m.dynamic || '-'} | Altura: ${m.pitch || '-'}`);
                         if (m.technique) badges.push(`💥 Técnica: ${m.technique}`);
 
@@ -894,6 +978,11 @@
                                     if (emo) details.push(`😊 Emoción: ${emo.icon} ${emo.label}`);
 
                                     if (isMusicMode) {
+                                        if (Array.isArray(m.instruments) && m.instruments.length > 0) {
+                                            let instStr = `🎸 Instrumentos: ${m.instruments.join(', ')}`;
+                                            if (m.instruments.includes('Piano') && m.pianoTimbre) instStr += ` (${m.pianoTimbre})`;
+                                            details.push(instStr);
+                                        }
                                         if (m.dynamic) details.push(`🔊 Dinámica: ${m.dynamic}`);
                                         if (m.pitch) details.push(`📏 Registro: ${m.pitch}`);
                                         if (m.technique) details.push(`🎶 Técnica: ${m.technique}`);
