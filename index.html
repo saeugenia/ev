@@ -539,6 +539,25 @@
 
                 if (doc.exists) {
                     const data = doc.data();
+
+                    // Comprobar si realmente hay cambios respecto al estado local para evitar re-renderizados y parpadeos
+                    const currentTitle = document.getElementById('storyTitle')?.value || '';
+                    const currentAuthor = document.getElementById('storyAuthor')?.value || '';
+                    const currentDate = document.getElementById('sessionDate')?.value || '';
+                    const currentClass = document.getElementById('sessionClass')?.value || 'Lenguaje';
+
+                    const hasDataChanged = 
+                        JSON.stringify(data.moments || []) !== JSON.stringify(moments) ||
+                        JSON.stringify(data.parsedCharacters || []) !== JSON.stringify(parsedCharacters) ||
+                        (data.title || '') !== currentTitle ||
+                        (data.author || '') !== currentAuthor ||
+                        (data.sessionDate || '') !== currentDate ||
+                        (data.sessionClass || 'Lenguaje') !== currentClass;
+
+                    if (!hasDataChanged) {
+                        return; // Omitir re-renderizado si la información local es idéntica
+                    }
+
                     if (editingMomentId === null) {
                         moments = data.moments || [];
                         parsedCharacters = data.parsedCharacters || [];
@@ -1521,7 +1540,6 @@
                     if (showNotice) {
                         console.log("Sesión sincronizada en Firebase");
                     }
-                    loadAvailableSessions();
                 })
                 .catch(err => {
                     console.error("Error al guardar en Firebase:", err);
@@ -1533,7 +1551,7 @@
         function closeHistoryModal() { document.getElementById('historyModal').classList.add('visually-hidden'); }
         function cerrarReflexion() { document.getElementById('finalReflectionArea').classList.add('visually-hidden'); }
         function terminarYReflexionar() { document.getElementById('finalReflectionArea').classList.remove('visually-hidden'); }
-        function startAutoSave() { if (autoSaveTimer) clearInterval(autoSaveTimer); autoSaveTimer = setInterval(() => saveDataLocal(false), 5000); }
+        function startAutoSave() { if (autoSaveTimer) clearInterval(autoSaveTimer); autoSaveTimer = setInterval(() => saveDataLocal(false), 300000); }
 
         window.onload = () => {
             initChart();
